@@ -3,30 +3,26 @@ Races = setmetatable({}, { __index = RaceRoom })
 
 RaceRoom.StartRaceRoom = function(currentRace, raceid)
 	currentRace.status = "loading"
-	currentRace.drivers = {}
-	currentRace.positions = {} -- gridPosition
-	currentRace.finishedCount = 0
 	Citizen.CreateThread(function()
-		local trackUGC = nil
+		local UGC = nil
 		if raceid then
 			local route_file, category= GetRouteFileByRaceID(raceid)
 			if route_file and category then
 				if string.find(route_file, "local_files") then
-					trackUGC = json.decode(LoadResourceFile(GetCurrentResourceName(), route_file))
+					UGC = json.decode(LoadResourceFile(GetCurrentResourceName(), route_file))
 				else
-					trackUGC = json.decode(LoadResourceFile("custom_creator", route_file))
+					UGC = json.decode(LoadResourceFile("custom_creator", route_file))
 				end
-				if category ~= "Custom" and trackUGC then
-					trackUGC.mission.gen.ownerid = category
+				if category ~= "Custom" and UGC and UGC.mission and UGC.mission.gen then
+					UGC.mission.gen.ownerid = category
 				end
 			end
 		else
-			trackUGC = races_data_web_caches[currentRace.ownerId]
+			UGC = races_data_web_caches[currentRace.ownerId]
 			races_data_web_caches[currentRace.ownerId] = nil
 		end
-		if trackUGC then
-			currentRace.currentTrackUGC = trackUGC
-			currentRace.ConvertFromUGC(currentRace)
+		local success, exist = currentRace.ConvertFromUGC(currentRace, UGC)
+		if success then
 			for k, v in pairs(currentRace.players) do
 				TriggerClientEvent("custom_races:client:countDown", v.src)
 				currentRace.InitDriverInfos(currentRace, v.src, v.nick)
@@ -34,55 +30,28 @@ RaceRoom.StartRaceRoom = function(currentRace, raceid)
 			end
 			currentRace.status = "racing"
 		else
+			currentRace.status = "invalid"
 			for k, v in pairs(currentRace.players) do
-				IdsRacesAll[tostring(v.src)] = nil
-				TriggerClientEvent("custom_races:client:exitRoom", v.src, "file-not-exist")
+				IdsRacesAll[v.src] = nil
+				TriggerClientEvent("custom_races:client:exitRoom", v.src, exist and "file-not-valid" or "file-not-exist")
 			end
-			currentRace.isFinished = true
 			races_data_web_caches[currentRace.ownerId] = nil
-			Races[currentRace.source] = nil
-		end
-	end)
-	Citizen.CreateThread(function()
-		while currentRace and not currentRace.isFinished do
-			local drivers = {}
-			for k, v in pairs(currentRace.drivers) do
-				drivers[v.playerId] = {
-					v.playerId,
-					v.playerName,
-					v.fps,
-					v.actualLap,
-					v.actualCheckpoint,
-					v.vehicle,
-					v.lastlap,
-					v.bestlap,
-					v.totalRaceTime,
-					v.totalCheckpointsTouched,
-					v.lastCheckpointPair,
-					v.hasFinished,
-					not v.hasFinished and GetEntityCoords(GetPlayerPed(tostring(v.playerId))) or v.currentCoords,
-					v.finishCoords,
-					v.dnf
-				}
-			end
-			local timeServerSide = GetGameTimer()
-			for k, v in pairs(currentRace.players) do
-				TriggerClientEvent("custom_races:client:syncDrivers", v.src, drivers, timeServerSide)
-			end
-			Citizen.Wait(500)
 		end
 	end)
 end
 
-RaceRoom.ConvertFromUGC = function(currentRace)
-	currentRace.actualTrack.trackName = currentRace.currentTrackUGC.mission.gen.nm
-	currentRace.actualTrack.creatorName = currentRace.currentTrackUGC.mission.gen.ownerid
-	currentRace.actualTrack.blimpText = currentRace.currentTrackUGC.mission.gen.blmpmsg
+RaceRoom.ConvertFromUGC = function(currentRace, UGC)
+	if not (UGC and UGC.mission and UGC.mission.gen and UGC.mission.gen.nm and UGC.mission.gen.ownerid and UGC.mission.race and UGC.mission.race.chp and UGC.mission.race.chp >= 3 and UGC.mission.veh and UGC.mission.veh.loc and #UGC.mission.veh.loc >= 1) then
+		return false, UGC and 1 or nil
+	end
+	currentRace.actualTrack.trackName = UGC.mission.gen.nm
+	currentRace.actualTrack.creatorName = UGC.mission.gen.ownerid
+	currentRace.actualTrack.blimpText = UGC.mission.gen.blmpmsg
 	currentRace.actualTrack.firework = {
-		name = currentRace.currentTrackUGC.firework and currentRace.currentTrackUGC.firework.name or "scr_indep_firework_trailburst",
-		r = currentRace.currentTrackUGC.firework and currentRace.currentTrackUGC.firework.r or 255,
-		g = currentRace.currentTrackUGC.firework and currentRace.currentTrackUGC.firework.g or 255,
-		b = currentRace.currentTrackUGC.firework and currentRace.currentTrackUGC.firework.b or 255
+		name = UGC.firework and UGC.firework.name or "scr_indep_firework_trailburst",
+		r = UGC.firework and UGC.firework.r or 255,
+		g = UGC.firework and UGC.firework.g or 255,
+		b = UGC.firework and UGC.firework.b or 255
 	}
 	-- Check if a predefined vehicle is not set for the track / the vehicle mode is "default"
 	if not currentRace.actualTrack.predefinedVehicle then
@@ -107,19 +76,19 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 	local isWantedMax = 26
 	local pair_isWantedMax = 27
 	]]
-	for i = 1, currentRace.currentTrackUGC.mission.race.chp, 1 do
+	for i = 1, UGC.mission.race.chp, 1 do
 		currentRace.actualTrack.checkpoints[i] = {}
-		currentRace.actualTrack.checkpoints[i].x = currentRace.currentTrackUGC.mission.race.chl[i].x + 0.0
-		currentRace.actualTrack.checkpoints[i].y = currentRace.currentTrackUGC.mission.race.chl[i].y + 0.0
-		currentRace.actualTrack.checkpoints[i].z = currentRace.currentTrackUGC.mission.race.chl[i].z + 0.0
-		currentRace.actualTrack.checkpoints[i].heading = currentRace.currentTrackUGC.mission.race.chh[i] + 0.0
-		currentRace.actualTrack.checkpoints[i].d = currentRace.currentTrackUGC.mission.race.chs and currentRace.currentTrackUGC.mission.race.chs[i] >= 0.5 and 10 * currentRace.currentTrackUGC.mission.race.chs[i] or 5.0
-		if currentRace.currentTrackUGC.mission.race.sndchk then
-			currentRace.actualTrack.checkpoints[i].pair_x = currentRace.currentTrackUGC.mission.race.sndchk[i].x + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_y = currentRace.currentTrackUGC.mission.race.sndchk[i].y + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_z = currentRace.currentTrackUGC.mission.race.sndchk[i].z + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_heading = currentRace.currentTrackUGC.mission.race.sndrsp[i] + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_d = currentRace.currentTrackUGC.mission.race.chs2 and (currentRace.currentTrackUGC.mission.race.chs2[i] >= 0.5 and 10 * currentRace.currentTrackUGC.mission.race.chs2[i] or 5.0) or currentRace.actualTrack.checkpoints[i].d
+		currentRace.actualTrack.checkpoints[i].x = UGC.mission.race.chl[i].x + 0.0
+		currentRace.actualTrack.checkpoints[i].y = UGC.mission.race.chl[i].y + 0.0
+		currentRace.actualTrack.checkpoints[i].z = UGC.mission.race.chl[i].z + 0.0
+		currentRace.actualTrack.checkpoints[i].heading = UGC.mission.race.chh[i] + 0.0
+		currentRace.actualTrack.checkpoints[i].d = UGC.mission.race.chs and UGC.mission.race.chs[i] >= 0.5 and 10 * UGC.mission.race.chs[i] or 5.0
+		if UGC.mission.race.sndchk then
+			currentRace.actualTrack.checkpoints[i].pair_x = UGC.mission.race.sndchk[i].x + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_y = UGC.mission.race.sndchk[i].y + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_z = UGC.mission.race.sndchk[i].z + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_heading = UGC.mission.race.sndrsp[i] + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_d = UGC.mission.race.chs2 and (UGC.mission.race.chs2[i] >= 0.5 and 10 * UGC.mission.race.chs2[i] or 5.0) or currentRace.actualTrack.checkpoints[i].d
 			if currentRace.actualTrack.checkpoints[i].pair_x == 0.0 and currentRace.actualTrack.checkpoints[i].pair_y == 0.0 and currentRace.actualTrack.checkpoints[i].pair_z == 0.0 then
 				currentRace.actualTrack.checkpoints[i].hasPair = false
 			else
@@ -133,8 +102,8 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 			currentRace.actualTrack.checkpoints[i].pair_d = 0.0
 			currentRace.actualTrack.checkpoints[i].hasPair = false
 		end
-		if currentRace.currentTrackUGC.mission.race.cpbs1 and currentRace.currentTrackUGC.mission.race.cpbs1[i] then
-			local cpbs1 = currentRace.currentTrackUGC.mission.race.cpbs1[i]
+		if UGC.mission.race.cpbs1 and UGC.mission.race.cpbs1[i] then
+			local cpbs1 = UGC.mission.race.cpbs1[i]
 			currentRace.actualTrack.checkpoints[i].isRound = isBitSet(cpbs1, isRound)
 			currentRace.actualTrack.checkpoints[i].isLarge = isBitSet(cpbs1, isLarge)
 			currentRace.actualTrack.checkpoints[i].isTemporal = isBitSet(cpbs1, isTemporal)
@@ -146,8 +115,8 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 		end
 		currentRace.actualTrack.checkpoints[i].planerot = nil
 		currentRace.actualTrack.checkpoints[i].pair_planerot = nil
-		if currentRace.currentTrackUGC.mission.race.cppsst and currentRace.currentTrackUGC.mission.race.cppsst[i] then
-			local cppsst = currentRace.currentTrackUGC.mission.race.cppsst[i]
+		if UGC.mission.race.cppsst and UGC.mission.race.cppsst[i] then
+			local cppsst = UGC.mission.race.cppsst[i]
 			if isBitSet(cppsst, 0) then
 				currentRace.actualTrack.checkpoints[i].planerot = "up"
 			elseif isBitSet(cppsst, 1) then
@@ -159,9 +128,9 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 			end
 		end
 		-- Other settings of checkpoints
-		--[[if currentRace.currentTrackUGC.mission.race.cpbs2 and currentRace.currentTrackUGC.mission.race.cpbs2[i] then
+		--[[if UGC.mission.race.cpbs2 and UGC.mission.race.cpbs2[i] then
 			-- todo list / client side + server side
-			local cpbs2 = currentRace.currentTrackUGC.mission.race.cpbs2[i]
+			local cpbs2 = UGC.mission.race.cpbs2[i]
 			currentRace.actualTrack.checkpoints[i].isUnderWater = isBitSet(cpbs2, isUnderWater)
 			currentRace.actualTrack.checkpoints[i].isWanted = isBitSet(cpbs2, isWanted)
 			currentRace.actualTrack.checkpoints[i].isWantedMax = isBitSet(cpbs2, isWantedMax)
@@ -170,33 +139,33 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 			currentRace.actualTrack.checkpoints[i].pair_isWantedMax = isBitSet(cpbs2, pair_isWantedMax)
 		end]]
 		-- Shift from primary checkpoints location?
-		--[[if currentRace.currentTrackUGC.mission.race.cpado then
+		--[[if UGC.mission.race.cpado then
 			-- todo list / client side + server side
-			currentRace.actualTrack.checkpoints[i].shiftX = currentRace.currentTrackUGC.mission.race.cpado[i].x + 0.0
-			currentRace.actualTrack.checkpoints[i].shiftY = currentRace.currentTrackUGC.mission.race.cpado[i].y + 0.0
-			currentRace.actualTrack.checkpoints[i].shiftZ = currentRace.currentTrackUGC.mission.race.cpado[i].z + 0.0
+			currentRace.actualTrack.checkpoints[i].shiftX = UGC.mission.race.cpado[i].x + 0.0
+			currentRace.actualTrack.checkpoints[i].shiftY = UGC.mission.race.cpado[i].y + 0.0
+			currentRace.actualTrack.checkpoints[i].shiftZ = UGC.mission.race.cpado[i].z + 0.0
 		end]]
 		-- Shift from secondary checkpoints location?
-		--[[if currentRace.currentTrackUGC.mission.race.cpados then
+		--[[if UGC.mission.race.cpados then
 			-- todo list / client side + server side
-			currentRace.actualTrack.checkpoints[i].pair_shiftX = currentRace.currentTrackUGC.mission.race.cpados[i].x + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_shiftY = currentRace.currentTrackUGC.mission.race.cpados[i].y + 0.0
-			currentRace.actualTrack.checkpoints[i].pair_shiftZ = currentRace.currentTrackUGC.mission.race.cpados[i].z + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_shiftX = UGC.mission.race.cpados[i].x + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_shiftY = UGC.mission.race.cpados[i].y + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_shiftZ = UGC.mission.race.cpados[i].z + 0.0
 		end]]
 		-- Rot of primary checkpoints? Pitch?
-		--[[if currentRace.currentTrackUGC.mission.race.chpp then
+		--[[if UGC.mission.race.chpp then
 			-- todo list / client side + server side
-			currentRace.actualTrack.checkpoints[i].rotFix = currentRace.currentTrackUGC.mission.race.chpp[i] + 0.0
+			currentRace.actualTrack.checkpoints[i].rotFix = UGC.mission.race.chpp[i] + 0.0
 		end]]
 		-- Rot of secondary checkpoints? Pitch?
-		--[[if currentRace.currentTrackUGC.mission.race.chpps then
+		--[[if UGC.mission.race.chpps then
 			-- todo list / client side + server side
-			currentRace.actualTrack.checkpoints[i].pair_rotFix = currentRace.currentTrackUGC.mission.race.chpps[i] + 0.0
+			currentRace.actualTrack.checkpoints[i].pair_rotFix = UGC.mission.race.chpps[i] + 0.0
 		end]]
-		currentRace.actualTrack.checkpoints[i].transform = currentRace.currentTrackUGC.mission.race.cptfrm and currentRace.currentTrackUGC.mission.race.cptfrm[i] or -1
-		currentRace.actualTrack.checkpoints[i].pair_transform = currentRace.currentTrackUGC.mission.race.cptfrms and currentRace.currentTrackUGC.mission.race.cptfrms[i] or -1
-		currentRace.actualTrack.checkpoints[i].random = currentRace.currentTrackUGC.mission.race.cptrtt and currentRace.currentTrackUGC.mission.race.cptrtt[i] or -1
-		currentRace.actualTrack.checkpoints[i].pair_random = currentRace.currentTrackUGC.mission.race.cptrtts and currentRace.currentTrackUGC.mission.race.cptrtts[i] or -1
+		currentRace.actualTrack.checkpoints[i].transform = UGC.mission.race.cptfrm and UGC.mission.race.cptfrm[i] or -1
+		currentRace.actualTrack.checkpoints[i].pair_transform = UGC.mission.race.cptfrms and UGC.mission.race.cptfrms[i] or -1
+		currentRace.actualTrack.checkpoints[i].random = UGC.mission.race.cptrtt and UGC.mission.race.cptrtt[i] or -1
+		currentRace.actualTrack.checkpoints[i].pair_random = UGC.mission.race.cptrtts and UGC.mission.race.cptrtts[i] or -1
 		if currentRace.actualTrack.checkpoints[i].isLarge then
 			currentRace.actualTrack.checkpoints[i].d = currentRace.actualTrack.checkpoints[i].d * 4.5
 		elseif currentRace.actualTrack.checkpoints[i].isRound or currentRace.actualTrack.checkpoints[i].warp or currentRace.actualTrack.checkpoints[i].planerot or (currentRace.actualTrack.checkpoints[i].transform ~= -1) then
@@ -209,28 +178,30 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 		end
 	end
 	-- Set the track grid positions
-	currentRace.actualTrack.positions = {}
+	currentRace.actualTrack.gridPositions = {}
 	local maxPlayers = Config.MaxPlayers
-	local totalPositions = #currentRace.currentTrackUGC.mission.veh.loc
+	local totalPositions = #UGC.mission.veh.loc
 	for i = 1, maxPlayers do
 		local index = i
 		if index > totalPositions then
 			index = math.random(totalPositions) -- If the actual number of players is less than the maximum number of players, the default is set to random loc
 		end
-		table.insert(currentRace.actualTrack.positions, {
-			x = currentRace.currentTrackUGC.mission.veh.loc[index].x + 0.0,
-			y = currentRace.currentTrackUGC.mission.veh.loc[index].y + 0.0,
-			z = currentRace.currentTrackUGC.mission.veh.loc[index].z + 0.0,
-			heading = currentRace.currentTrackUGC.mission.veh.head[index] + 0.0
+		table.insert(currentRace.actualTrack.gridPositions, {
+			x = UGC.mission.veh.loc[index].x + 0.0,
+			y = UGC.mission.veh.loc[index].y + 0.0,
+			z = UGC.mission.veh.loc[index].z + 0.0,
+			heading = UGC.mission.veh.head[index] + 0.0
 		})
 	end
 	-- Set the track transform vehicles if it exists
-	currentRace.actualTrack.transformVehicles = currentRace.currentTrackUGC.mission.race.trfmvm or {}
-	currentRace.actualTrack.cp1_unknown_unknowns = currentRace.currentTrackUGC.mission.race.cptrtt and true or false
-	currentRace.actualTrack.cp2_unknown_unknowns = currentRace.currentTrackUGC.mission.race.cptrtts and true or false
+	currentRace.actualTrack.transformVehicles = UGC.mission.race.trfmvm or {}
+	currentRace.actualTrack.cp1_unknown_unknowns = UGC.mission.race.cptrtt and true or false
+	currentRace.actualTrack.cp2_unknown_unknowns = UGC.mission.race.cptrtts and true or false
 	-- Set the track veh class blacklist
+	UGC.meta = UGC.meta or {}
+	UGC.meta.vehcl = UGC.meta.vehcl or {}
 	currentRace.actualTrack.blacklistClass = {}
-	for k, v in pairs(currentRace.currentTrackUGC.meta.vehcl) do
+	for k, v in pairs(UGC.meta.vehcl) do
 		if v == "Compacts" then
 			table.insert(currentRace.actualTrack.blacklistClass, 0)
 		elseif v == "Sedans" then
@@ -277,98 +248,94 @@ RaceRoom.ConvertFromUGC = function(currentRace)
 	end
 	-- Populate the props (props) for the track from the UGC data
 	currentRace.actualTrack.props = {}
-	if currentRace.currentTrackUGC.mission.prop and currentRace.currentTrackUGC.mission.prop.no --[[the value may be nil in 2024+ newer json]] then
-		for i = 1, currentRace.currentTrackUGC.mission.prop.no do
+	if UGC.mission.prop and UGC.mission.prop.no --[[the value may be nil in 2024+ newer json]] then
+		for i = 1, UGC.mission.prop.no do
 			table.insert(currentRace.actualTrack.props, {
-				hash = currentRace.currentTrackUGC.mission.prop.model[i],
-				x = currentRace.currentTrackUGC.mission.prop.loc[i].x + 0.0,
-				y = currentRace.currentTrackUGC.mission.prop.loc[i].y + 0.0,
-				z = currentRace.currentTrackUGC.mission.prop.loc[i].z + 0.0,
-				rot = {x = currentRace.currentTrackUGC.mission.prop.vRot[i].x + 0.0, y = currentRace.currentTrackUGC.mission.prop.vRot[i].y + 0.0, z = currentRace.currentTrackUGC.mission.prop.vRot[i].z + 0.0},
-				prpclr = currentRace.currentTrackUGC.mission.prop.prpclr and currentRace.currentTrackUGC.mission.prop.prpclr[i] or nil,
-				dist = currentRace.currentTrackUGC.mission.prop.pLODDist and currentRace.currentTrackUGC.mission.prop.pLODDist[i] or nil,
-				invisible = currentRace.currentTrackUGC.mission.prop.prpbs and isBitSet(currentRace.currentTrackUGC.mission.prop.prpbs[i], 9),
-				collision = not currentRace.currentTrackUGC.mission.prop.collision or (currentRace.currentTrackUGC.mission.prop.collision and (currentRace.currentTrackUGC.mission.prop.collision[i] == 1))
+				hash = UGC.mission.prop.model[i],
+				x = UGC.mission.prop.loc[i].x + 0.0,
+				y = UGC.mission.prop.loc[i].y + 0.0,
+				z = UGC.mission.prop.loc[i].z + 0.0,
+				rot = {x = UGC.mission.prop.vRot[i].x + 0.0, y = UGC.mission.prop.vRot[i].y + 0.0, z = UGC.mission.prop.vRot[i].z + 0.0},
+				prpclr = UGC.mission.prop.prpclr and UGC.mission.prop.prpclr[i] or nil,
+				dist = UGC.mission.prop.pLODDist and UGC.mission.prop.pLODDist[i] or nil,
+				invisible = UGC.mission.prop.prpbs and isBitSet(UGC.mission.prop.prpbs[i], 9),
+				collision = not UGC.mission.prop.collision or (UGC.mission.prop.collision and (UGC.mission.prop.collision[i] == 1))
 			})
 		end
 	end
 	-- Populate the dynamic props (dprops) for the track from the UGC data
 	currentRace.actualTrack.dprops = {}
-	if currentRace.currentTrackUGC.mission.dprop and currentRace.currentTrackUGC.mission.dprop.no --[[the value may be nil in 2024+ newer json]] then
-		for i = 1, currentRace.currentTrackUGC.mission.dprop.no do
+	if UGC.mission.dprop and UGC.mission.dprop.no --[[the value may be nil in 2024+ newer json]] then
+		for i = 1, UGC.mission.dprop.no do
 			table.insert(currentRace.actualTrack.dprops, {
-				hash = currentRace.currentTrackUGC.mission.dprop.model[i],
-				x = currentRace.currentTrackUGC.mission.dprop.loc[i].x + 0.0,
-				y = currentRace.currentTrackUGC.mission.dprop.loc[i].y + 0.0,
-				z = currentRace.currentTrackUGC.mission.dprop.loc[i].z + 0.0,
-				rot = {x = currentRace.currentTrackUGC.mission.dprop.vRot[i].x + 0.0, y = currentRace.currentTrackUGC.mission.dprop.vRot[i].y + 0.0, z = currentRace.currentTrackUGC.mission.dprop.vRot[i].z + 0.0},
-				prpdclr = currentRace.currentTrackUGC.mission.dprop.prpdclr and currentRace.currentTrackUGC.mission.dprop.prpdclr[i] or nil,
-				collision = not currentRace.currentTrackUGC.mission.dprop.collision or (currentRace.currentTrackUGC.mission.dprop.collision and (currentRace.currentTrackUGC.mission.dprop.collision[i] == 1))
+				hash = UGC.mission.dprop.model[i],
+				x = UGC.mission.dprop.loc[i].x + 0.0,
+				y = UGC.mission.dprop.loc[i].y + 0.0,
+				z = UGC.mission.dprop.loc[i].z + 0.0,
+				rot = {x = UGC.mission.dprop.vRot[i].x + 0.0, y = UGC.mission.dprop.vRot[i].y + 0.0, z = UGC.mission.dprop.vRot[i].z + 0.0},
+				prpdclr = UGC.mission.dprop.prpdclr and UGC.mission.dprop.prpdclr[i] or nil,
+				collision = not UGC.mission.dprop.collision or (UGC.mission.dprop.collision and (UGC.mission.dprop.collision[i] == 1))
 			})
 		end
 	end
 	-- Populate the props (dhprops) to remove for the track from the UGC data
 	currentRace.actualTrack.dhprop = {}
-	if currentRace.currentTrackUGC.mission.dhprop and currentRace.currentTrackUGC.mission.dhprop.no --[[the value may be nil in 2024+ newer json]] then
-		for i = 1, currentRace.currentTrackUGC.mission.dhprop.no do
+	if UGC.mission.dhprop and UGC.mission.dhprop.no --[[the value may be nil in 2024+ newer json]] then
+		for i = 1, UGC.mission.dhprop.no do
 			table.insert(currentRace.actualTrack.dhprop, {
-				hash = currentRace.currentTrackUGC.mission.dhprop.mn[i]
+				hash = UGC.mission.dhprop.mn[i]
 			})
 		end
 	end
 	for k, v in pairs(currentRace.players) do
 		TriggerClientEvent("custom_races:client:loadTrack", v.src, currentRace.data, currentRace.actualTrack, currentRace.source)
 	end
+	return true, 1
 end
 
 RaceRoom.InvitePlayer = function(currentRace, playerId, roomId, inviteId)
 	local hasJoin = false
-	-- Check if the player is already in the race
 	for k, v in pairs(currentRace.players) do
 		if v.src == playerId then
 			hasJoin = true
 			break
 		end
 	end
-	-- If the player is not in the race and still online, send an invitation
 	if not hasJoin and GetPlayerName(playerId) then
-		currentRace.invitations[tostring(playerId)] = { nick = GetPlayerName(playerId), src = playerId }
-		local timeServerSide = GetGameTimer()
-		for k, v in pairs(currentRace.players) do
-			TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
-		end
-		TriggerClientEvent("custom_races:client:receiveInvitation", playerId, roomId, GetPlayerName(inviteId), currentRace.name)
+		currentRace.invitations[playerId] = { nick = GetPlayerName(playerId), src = playerId }
+		currentRace.syncNextFrame = true
+		TriggerClientEvent("custom_races:client:receiveInvitation", playerId, roomId, inviteId and GetPlayerName(inviteId) or "System", currentRace.data.name)
 	end
 end
 
 RaceRoom.RemoveInvitation = function(currentRace, playerId)
-	currentRace.invitations[tostring(playerId)] = nil
-	local timeServerSide = GetGameTimer()
-	for k, v in pairs(currentRace.players) do
-		TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
+	if currentRace.invitations[playerId] then
+		currentRace.invitations[playerId] = nil
+		currentRace.syncNextFrame = true
+		TriggerClientEvent("custom_races:client:removeinvitation", playerId, currentRace.source)
 	end
-	TriggerClientEvent("custom_races:client:removeinvitation", playerId, currentRace.source)
 end
 
 RaceRoom.AcceptInvitation = function(currentRace, playerId, playerName, fromInvite)
-	currentRace.invitations[tostring(playerId)] = nil
-	table.insert(currentRace.players, {nick = playerName, src = playerId, ownerRace = false, vehicle = currentRace.data.vehicle == "specific" and currentRace.players[1] and currentRace.players[1].vehicle or false})
-	local timeServerSide = GetGameTimer()
+	local hasJoin = false
 	for k, v in pairs(currentRace.players) do
 		if v.src == playerId then
-			IdsRacesAll[tostring(playerId)] = tostring(currentRace.source)
-			TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, currentRace.name, currentRace.data, true)
-		else
-			TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
+			hasJoin = true
+			break
 		end
 	end
+	if hasJoin then return end
+	IdsRacesAll[playerId] = currentRace.source
+	table.insert(currentRace.players, {nick = playerName, src = playerId, ownerRace = false, vehicle = currentRace.data.vehicle == "specific" and currentRace.players[currentRace.ownerId] and currentRace.players[currentRace.ownerId].vehicle or false})
+	currentRace.invitations[playerId] = nil
+	currentRace.syncNextFrame = true
+	TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", playerId, currentRace.data, true)
 end
 
 RaceRoom.DenyInvitation = function(currentRace, playerId)
-	currentRace.invitations[tostring(playerId)] = nil
-	local timeServerSide = GetGameTimer()
-	for k, v in pairs(currentRace.players) do
-		TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
+	if currentRace.invitations[playerId] then
+		currentRace.invitations[playerId] = nil
+		currentRace.syncNextFrame = true
 	end
 end
 
@@ -397,68 +364,93 @@ RaceRoom.InitDriverInfos = function(currentRace, playerId, playerName)
 end
 
 RaceRoom.JoinRaceMidway = function(currentRace, playerId, playerName, fromInvite)
-	currentRace.invitations[tostring(playerId)] = nil
-	table.insert(currentRace.players, {nick = playerName, src = playerId, ownerRace = false, vehicle = currentRace.data.vehicle == "specific" and currentRace.players[1] and currentRace.players[1].vehicle or false})
-	currentRace.InitDriverInfos(currentRace, playerId, playerName)
-	local timeServerSide = GetGameTimer()
+	local hasJoin = false
 	for k, v in pairs(currentRace.players) do
 		if v.src == playerId then
-			IdsRacesAll[tostring(playerId)] = tostring(currentRace.source)
-			TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, currentRace.name, currentRace.data, false)
-		else
-			TriggerClientEvent("custom_races:client:playerJoinRace", v.src, playerName)
-			TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
+			hasJoin = true
+			break
 		end
 	end
+	if hasJoin then return end
+	IdsRacesAll[playerId] = currentRace.source
+	table.insert(currentRace.players, {nick = playerName, src = playerId, ownerRace = false, vehicle = currentRace.data.vehicle == "specific" and currentRace.players[currentRace.ownerId] and currentRace.players[currentRace.ownerId].vehicle or false})
+	currentRace.invitations[playerId] = nil
+	currentRace.syncNextFrame = true
+	TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", playerId, currentRace.data, false)
 	TriggerClientEvent("custom_races:client:loadTrack", playerId, currentRace.data, currentRace.actualTrack, currentRace.source)
+	currentRace.InitDriverInfos(currentRace, playerId, playerName)
 	TriggerClientEvent("custom_races:client:startRaceRoom", playerId, 1, currentRace.actualTrack.predefinedVehicle)
+	for k, v in pairs(currentRace.players) do
+		if v.src ~= playerId then
+			TriggerClientEvent("custom_races:client:playerJoinRace", v.src, playerName)
+		end
+	end
 end
 
-RaceRoom.ClientSync = function(currentRace, playerId, data, timeClientSide)
-	currentRace.drivers[playerId].timeClientSide = timeClientSide
-	currentRace.drivers[playerId].fps = data[1]
-	currentRace.drivers[playerId].actualLap = data[2]
-	currentRace.drivers[playerId].actualCheckpoint = data[3]
-	currentRace.drivers[playerId].vehicle = data[4]
-	currentRace.drivers[playerId].lastlap = data[5]
-	currentRace.drivers[playerId].bestlap = data[6]
-	currentRace.drivers[playerId].totalRaceTime = data[7]
-	currentRace.drivers[playerId].totalCheckpointsTouched = data[8]
-	currentRace.drivers[playerId].lastCheckpointPair = data[9]
+RaceRoom.ClientSync = function(currentRace, currentDriver, data, timeClientSide)
+	currentDriver.timeClientSide = timeClientSide
+	currentDriver.fps = data[1]
+	currentDriver.actualLap = data[2]
+	currentDriver.actualCheckpoint = data[3]
+	currentDriver.vehicle = data[4]
+	currentDriver.lastlap = data[5]
+	currentDriver.bestlap = data[6]
+	currentDriver.totalRaceTime = data[7]
+	currentDriver.totalCheckpointsTouched = data[8]
+	currentDriver.lastCheckpointPair = data[9]
 end
 
-RaceRoom.PlayerFinish = function(currentRace, playerId, hasCheated, finishCoords, raceStatus)
-	currentRace.finishedCount = currentRace.finishedCount + 1
-	currentRace.drivers[playerId].hasCheated = hasCheated
-	currentRace.drivers[playerId].hasFinished = true
-	currentRace.drivers[playerId].finishCoords = finishCoords
+RaceRoom.GetFinishedAndValidCount = function(currentRace)
+	local finishedCount = 0
+	local validPlayerCount = 0
+	local onlinePlayers = {}
+	for k, v in pairs(GetPlayers()) do
+		onlinePlayers[tonumber(v)] = true
+	end
+	for k, v in pairs(currentRace.drivers) do
+		if v.hasFinished then
+			finishedCount = finishedCount + 1
+		end
+	end
+	for k, v in pairs(currentRace.players) do
+		if onlinePlayers[v.src] and IdsRacesAll[v.src] == currentRace.source then
+			validPlayerCount = validPlayerCount + 1
+		end
+	end
+	return finishedCount, validPlayerCount
+end
+
+RaceRoom.PlayerFinish = function(currentRace, currentDriver, hasCheated, finishCoords, raceStatus)
+	currentDriver.hasCheated = hasCheated
+	currentDriver.hasFinished = true
+	currentDriver.finishCoords = finishCoords
 	if raceStatus == "dnf" or raceStatus == "spectator" then
-		currentRace.drivers[playerId].dnf = true
+		currentDriver.dnf = true
 	elseif raceStatus == "yeah" then
-		currentRace.drivers[playerId].dnf = false
-		currentRace.UpdateRanking(currentRace, playerId)
+		currentDriver.dnf = false
+		currentRace.UpdateRanking(currentRace, currentDriver)
 	end
-	if currentRace.finishedCount >= #currentRace.players and not currentRace.isFinished then
+	local finishedCount, validPlayerCount = currentRace.GetFinishedAndValidCount(currentRace)
+	if finishedCount >= validPlayerCount and not currentRace.isAnyPlayerJoining and (currentRace.status == "racing" or currentRace.status == "dnf") then
 		currentRace.FinishRace(currentRace)
-	elseif tonumber(currentRace.data.dnf) and ((currentRace.finishedCount / (tonumber(currentRace.data.dnf))) >= #currentRace.players) and not currentRace.DNFstarted then
-		currentRace.DNFstarted = true
-		TriggerClientEvent("custom_races:client:enableSpecMode", playerId, raceStatus)
-		currentRace.startDNFCountdown(currentRace)
+	elseif tonumber(currentRace.data.dnf) and (finishedCount / tonumber(currentRace.data.dnf)) >= validPlayerCount and not currentRace.isAnyPlayerJoining and currentRace.status == "racing" then
+		currentRace.DNFCountdown(currentRace)
+		TriggerClientEvent("custom_races:client:enableSpecMode", currentDriver.playerId, raceStatus)
 	else
-		TriggerClientEvent("custom_races:client:enableSpecMode", playerId, raceStatus)
+		TriggerClientEvent("custom_races:client:enableSpecMode", currentDriver.playerId, raceStatus)
 	end
 end
 
-RaceRoom.UpdateRanking = function(currentRace, playerId)
-	if not currentRace.drivers[playerId].hasCheated and currentRace.data.raceid then
+RaceRoom.UpdateRanking = function(currentRace, currentDriver)
+	if not currentDriver.hasCheated and currentRace.data.raceid then
 		local results = MySQL.query.await("SELECT besttimes FROM custom_race_list WHERE raceid = ?", {currentRace.data.raceid})
 		local og_besttimes = results and results[1] and json.decode(results[1].besttimes) or {}
 		local names = {}
 		local besttimes = {}
 		table.insert(og_besttimes, {
-			name = currentRace.drivers[playerId].playerName,
-			time = currentRace.drivers[playerId].bestlap,
-			vehicle = currentRace.drivers[playerId].vehicle,
+			name = currentDriver.playerName,
+			time = currentDriver.bestlap,
+			vehicle = currentDriver.vehicle,
 			date = os.date("%x")
 		})
 		table.sort(og_besttimes, function(a, b) return a.time < b.time end)
@@ -472,14 +464,18 @@ RaceRoom.UpdateRanking = function(currentRace, playerId)
 	end
 end
 
-RaceRoom.startDNFCountdown = function(currentRace)
+RaceRoom.DNFCountdown = function(currentRace)
+	if currentRace.status == "dnf" then return end
+	currentRace.status = "dnf"
 	for k, v in pairs(currentRace.players) do
 		TriggerClientEvent("custom_races:client:startDNFCountdown", v.src, currentRace.source)
 	end
 end
 
 RaceRoom.FinishRace = function(currentRace)
-	currentRace.isFinished = true
+	if currentRace.status == "ending" then return end
+	currentRace.status = "ending"
+	local timeServerSide = GetGameTimer() + 3000
 	local drivers = {}
 	for k, v in pairs(currentRace.drivers) do
 		drivers[v.playerId] = {
@@ -500,35 +496,28 @@ RaceRoom.FinishRace = function(currentRace)
 			v.dnf
 		}
 	end
-	local timeServerSide = GetGameTimer() + 3000
 	for k, v in pairs(currentRace.players) do
+		IdsRacesAll[v.src] = nil
 		TriggerClientEvent("custom_races:client:syncDrivers", v.src, drivers, timeServerSide)
 		TriggerClientEvent("custom_races:client:showFinalResult", v.src)
 	end
-	Citizen.Wait(3000) -- This may solve some sync issues under very poor network conditions or caused by frequent data updates!
-	Races[currentRace.source] = nil
 end
 
-RaceRoom.LeaveRace = function(currentRace, playerId)
-	if currentRace.status == "racing" then
-		if currentRace.drivers[playerId].hasFinished then
-			currentRace.finishedCount = currentRace.finishedCount - 1
+RaceRoom.LeaveRace = function(currentRace, playerId, playerName)
+	for k, v in pairs(currentRace.players) do
+		if v.src == playerId then
+			IdsRacesAll[v.src] = nil
+			table.remove(currentRace.players, k)
+			break
 		end
-		local playerName = currentRace.drivers[playerId].playerName
-		currentRace.drivers[playerId] = nil
-		for k, v in pairs(currentRace.players) do
-			if v.src == playerId then
-				IdsRacesAll[tostring(v.src)] = nil
-				table.remove(currentRace.players, k)
-				break
-			end
-		end
-		for k, v in pairs(currentRace.players) do
-			TriggerClientEvent("custom_races:client:playerLeaveRace", v.src, playerName, true)
-		end
-		if currentRace.finishedCount >= #currentRace.players and not currentRace.isFinished then
-			currentRace.FinishRace(currentRace)
-		end
+	end
+	for k, v in pairs(currentRace.players) do
+		TriggerClientEvent("custom_races:client:playerLeaveRace", v.src, playerName, true)
+	end
+	currentRace.drivers[playerId] = nil
+	local finishedCount, validPlayerCount = currentRace.GetFinishedAndValidCount(currentRace)
+	if finishedCount >= validPlayerCount and not currentRace.isAnyPlayerJoining then
+		currentRace.FinishRace(currentRace)
 	end
 end
 
@@ -536,13 +525,10 @@ RaceRoom.PlayerDropped = function(currentRace, playerId)
 	while currentRace.status == "loading" or currentRace.inJoinProgress[playerId] do
 		Citizen.Wait(0)
 	end
-	if currentRace.status == "racing" then
-		if currentRace.drivers[playerId] then
-			if currentRace.drivers[playerId].hasFinished then
-				currentRace.finishedCount = currentRace.finishedCount - 1
-			end
-			local playerName = currentRace.drivers[playerId].playerName
-			currentRace.drivers[playerId] = nil
+	if currentRace.status == "racing" or currentRace.status == "dnf" then
+		local currentDriver = currentRace.drivers[playerId]
+		local playerName = currentDriver and currentDriver.playerName
+		if currentDriver then
 			for k, v in pairs(currentRace.players) do
 				if v.src == playerId then
 					table.remove(currentRace.players, k)
@@ -552,38 +538,36 @@ RaceRoom.PlayerDropped = function(currentRace, playerId)
 			for k, v in pairs(currentRace.players) do
 				TriggerClientEvent("custom_races:client:playerLeaveRace", v.src, playerName, false)
 			end
-			if currentRace.finishedCount >= #currentRace.players and not currentRace.isFinished then
-				currentRace.FinishRace(currentRace)
-			end
+			currentRace.drivers[playerId] = nil
+		end
+		local finishedCount, validPlayerCount = currentRace.GetFinishedAndValidCount(currentRace)
+		if finishedCount >= validPlayerCount and not currentRace.isAnyPlayerJoining then
+			currentRace.FinishRace(currentRace)
 		end
 	elseif currentRace.status == "waiting" then
 		if playerId == currentRace.ownerId then
-			-- Kick all players from the room
+			currentRace.status = "invalid"
 			for k, v in pairs(currentRace.players) do
 				if v.src ~= playerId then
-					IdsRacesAll[tostring(v.src)] = nil
+					IdsRacesAll[v.src] = nil
 					TriggerClientEvent("custom_races:client:exitRoom", v.src, "leave")
 				end
 			end
-			Races[currentRace.source] = nil
 		else
-			local canSyncToClient = false
+			local found = false
 			for k, v in pairs(currentRace.players) do
 				if v.src == playerId then
-					table.remove(currentRace.players, k) -- remove player name from room (In room)
-					canSyncToClient = true
+					table.remove(currentRace.players, k)
+					found = true
 					break
 				end
 			end
-			if currentRace.invitations[tostring(playerId)] ~= nil then
-				currentRace.invitations[tostring(playerId)] = nil -- remove player name from room (Guest)
-				canSyncToClient = true
+			if currentRace.invitations[playerId] then
+				currentRace.invitations[playerId] = nil
+				found = true
 			end
-			if canSyncToClient then
-				local timeServerSide = GetGameTimer()
-				for k, v in pairs(currentRace.players) do
-					TriggerClientEvent("custom_races:client:syncPlayers", v.src, currentRace.players, currentRace.invitations, currentRace.data.maxplayers, timeServerSide)
-				end
+			if found then
+				currentRace.syncNextFrame = true
 			end
 		end
 	end
@@ -592,6 +576,78 @@ end
 function isBitSet(x, n)
 	return (x & (1 << n)) ~= 0
 end
+
+--[[prpbs-Static Prop
+0 PROP_IgnoreVisCheck
+1 PROP_IgnoreVisCheckCleanup
+2 PROP_CleanupAtMidpoint
+3 PROP_Position_Override
+4 PROP_Rotation_Override
+5 PROP_NGSpawnOnly
+6 PROP_LGSpawnOnly
+7 PROP_CleanupAtMissionEnd
+8 PROP_FreeRotated
+9 PROP_SetInvisible
+10 PROP_EmitRadio
+11 PROP_EmitCrashSound
+12 PROP_AssociatedSpawn
+13 PROP_SuddenDeathTarget
+14 PROP_EnableTrackify
+15 PROP_TriggerForAllRacers
+16 PROP_TriggerOnEachLap
+17 PROP_KeepInPlace
+18 PROP_Cleanup_Flash
+19 PROP_Cleanup_Fade
+20 PROP_Cleanup_Detonate
+21 PROP_Sound_Trigger_Play_Toggle
+22 PROP_Sound_Trigger_Played_This_Lap
+23 PROP_Sound_Trigger_Play_Once_Per_Lap
+24 PROP_Sound_Trigger_Is_Invisible
+25 PROP_PTFX_Played
+26 PROP_Lock_Delete
+27 PROP_Local_Align
+28 PROP_Cleanup_Triggered
+29 PROP_Is_Claimable
+30 PROP_Requires_Alpha_Flash
+31 PROP_Marked_for_correction]]
+
+--[[prpbs2-Static Prop
+0 PROP2_SLOW_DOWN_ENABLE
+1 PROP2_SLOW_DOWN_ENABLE_EFFECT
+2 PROP2_CAN_BE_TAGGED
+3 PROP2_CylindricalSoundTrigger
+4 PROP2_TriggerAlarmViaCCTV
+5 PROP2_InvertUpdateRotation
+6 PROP2_CleanUpVFX
+7 PROP2_BlipAsSafeProp
+8 PROP2_NoCollision
+9 PROP2_UsePlacedFireworkZone
+10 PROP2_Clamp_X_Override_Value
+11 PROP2_Clamp_Y_Override_Value
+12 PROP2_Clamp_Z_Override_Value
+13 PROP2_UseAsTurret
+14 PROP2_UFO_Spin
+15 PROP2_UFO_Light
+16 PROP2_HidePropInCutscene
+17 PROP2_Reposition_Based_On_Painting_Index
+18 PROP2_HavePropMatchLobbyHostVehicle
+19 PROP2_PlacedInAnInterior]]
+
+--[[prpbs-Dynamic Prop
+0 DYNOPROP_IgnoreVisCheck
+1 DYNOPROP_IgnoreVisCheckCleanup
+2 DYNOPROP_CleanupAtMidpoint
+3 DYNOPROP_CleanupAtMissionEnd
+4 DYNOPROP_ExplodeOnTouch
+5 DYNOPROP_KamakaziInvincibility
+6 DYNOPROP_DestroyInOneHit
+7 DYNOPROP_Position_Override
+8 DYNOPROP_Rotation_Override
+9 DYNOPROP_AffectedByScopingOut
+10 DYNOPROP_ShowBlip
+11 DYNOPROP_UsingNewBlipSpriteData
+12 DYNOPROP_DroppedByEvent
+13 DYNOPROP_InAnInterior]]
 
 -- THANKS TO JoraEmin52!!!
 --[[cpbs1
