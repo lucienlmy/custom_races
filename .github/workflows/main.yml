@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        branch: [main, master, dev]
+        branch: [main]
     steps:
       - name: Checkout target repo
         uses: actions/checkout@v4
