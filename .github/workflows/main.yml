@@ -3,29 +3,26 @@ name: Sync Fork (Multi-branch with Auto PR & Upstream Fallback)
 on:
   schedule:
     - cron: '0 18 * * *'   # 每天北京时间 02:00 (UTC 18:00)
-  workflow_dispatch:       # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        branch: [main]   # 需要同步的分支列表
+        branch: [main, master, dev]
     steps:
-      # 1. 检出当前 fork 仓库代码
       - name: Checkout target repo
         uses: actions/checkout@v4
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      # 2. 配置 Git 用户信息
       - name: Set up Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      # 3. 自动检测上游仓库地址，如果失败则使用手写的备用地址
       - name: Detect or fallback upstream repo
         run: |
           FALLBACK="https://github.com/原作者/仓库名.git"
@@ -42,7 +39,6 @@ jobs:
           git remote add upstream $UPSTREAM
           git fetch upstream
 
-      # 4. 创建同步分支并合并上游更新（带分支存在性检测 + 忽略 workflow 文件）
       - name: Create sync branch
         run: |
           BRANCH="sync-${{ matrix.branch }}-$(date +%Y%m%d%H%M%S)"
@@ -59,30 +55,32 @@ jobs:
             exit 0
           fi
 
-          # 确保本地有最新的分支引用
+          # 拉取远程分支，确保引用存在
           git fetch origin ${{ matrix.branch }} || true
           git fetch upstream ${{ matrix.branch }} || true
 
           # 切换到目标分支
           git checkout ${{ matrix.branch }} || git checkout -b ${{ matrix.branch }} origin/${{ matrix.branch }}
 
-          # 合并上游更新（允许冲突，后续通过 PR 解决）
+          # 合并上游更新
           git merge upstream/${{ matrix.branch }} || true
 
-          # 丢弃 workflow 文件的改动，避免推送失败
+          # 丢弃 workflow 文件改动，避免推送失败
           git checkout HEAD -- .github/workflows/ || true
           git reset HEAD .github/workflows/ || true
 
-          # 新建同步分支保存合并结果
+          # 新建同步分支
           git checkout -b $BRANCH
+
+          # 推送前再次 fetch 并 reset，确保状态一致
+          git fetch origin $BRANCH || true
+          git reset --hard origin/$BRANCH || true
 
           # 推送到 fork 仓库
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $BRANCH
 
-          # 保存分支名供后续步骤使用
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
-      # 5. 自动创建 Pull Request
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
