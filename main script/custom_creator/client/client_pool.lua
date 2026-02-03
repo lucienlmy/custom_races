@@ -61,14 +61,10 @@ function SpawnNearbyObjects()
 				if not global_var.quitingTest and not global_var.joiningTest then
 					local pos = vector3(0.0, 0.0, 0.0)
 					if objectPool.forceLoad.x and objectPool.forceLoad.y and objectPool.forceLoad.z then
-						pos.x = objectPool.forceLoad.x
-						pos.y = objectPool.forceLoad.y
-						pos.z = objectPool.forceLoad.z
+						pos = vector3(objectPool.forceLoad.x, objectPool.forceLoad.y, objectPool.forceLoad.z)
 					else
 						local coords = GetEntityCoords(PlayerPedId())
-						pos.x = RoundedValue(coords.x, 3)
-						pos.y = RoundedValue(coords.y, 3)
-						pos.z = RoundedValue(coords.z, 3)
+						pos = vector3(RoundedValue(coords.x, 3), RoundedValue(coords.y, 3), RoundedValue(coords.z, 3))
 					end
 					local gx = math.floor(pos.x / 100.0)
 					local gy = math.floor(pos.y / 100.0)
