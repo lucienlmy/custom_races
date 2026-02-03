@@ -33,6 +33,12 @@ RegisterNetEvent("custom_races:client:joinPlayerRoom", function(data, bool)
 	joinRaceVehicle = GetVehiclePedIsIn(ped, false)
 	SwitchOutPlayer(ped, 0, 1)
 	StartScreenEffect("MenuMGIn", 1, true)
+	Citizen.Wait(5000)
+	if not enableXboxController then
+		enableXboxController = true
+		XboxControlSimulation()
+		LoopGetNUIFramerateMoveFix()
+	end
 end)
 
 RegisterNetEvent("custom_races:client:joinPublicRoom", function(data, bool)
@@ -48,6 +54,12 @@ RegisterNetEvent("custom_races:client:joinPublicRoom", function(data, bool)
 	joinRaceVehicle = GetVehiclePedIsIn(ped, false)
 	SwitchOutPlayer(ped, 0, 1)
 	StartScreenEffect("MenuMGIn", 1, true)
+	Citizen.Wait(5000)
+	if not enableXboxController then
+		enableXboxController = true
+		XboxControlSimulation()
+		LoopGetNUIFramerateMoveFix()
+	end
 end)
 
 RegisterNetEvent("custom_races:client:joinRoomFailed", function(_str)
@@ -107,6 +119,12 @@ RegisterNetEvent("custom_races:client:exitRoom", function(_str)
 			action = "nui_msg:showNotification",
 			message = GetTranslate("msg-file-not-valid")
 		})
+	end
+	Citizen.Wait(5000)
+	if not enableXboxController then
+		enableXboxController = true
+		XboxControlSimulation()
+		LoopGetNUIFramerateMoveFix()
 	end
 end)
 

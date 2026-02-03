@@ -456,6 +456,12 @@ noCollisionObjects = {
 	[GetHashKey("ar_prop_ar_checkpoint_fork")] = true
 }
 
+effectObjects = {
+	[GetHashKey("stt_prop_hoop_small_01")] = 1,
+	[GetHashKey("ar_prop_ar_hoop_med_01")] = 2,
+	[GetHashKey("stt_prop_hoop_constraction_01a")] = 3
+}
+
 isAllModelChecked = false
 checkedModelsCount = 0
 totalModelsCount = 0
@@ -488,6 +494,10 @@ Citizen.CreateThread(function()
 					}
 				end
 				table.insert(valid_category[current_category].model, category[i].model[j])
+				local min, max = GetModelDimensions(hash)
+				dimensions.min[hash] = min
+				dimensions.max[hash] = max
+				dimensions.radius[hash] = math.sqrt((max.x - min.x)^2 + (max.y - min.y)^2 + (max.z - min.z)^2) * 0.5
 				SetModelAsNoLongerNeeded(hash)
 			end
 		end

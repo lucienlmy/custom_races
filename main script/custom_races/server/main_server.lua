@@ -11,6 +11,7 @@ RaceServer.Data.SearchCaches = {}
 RaceServer.Data.IsUpdatingData = true
 RaceServer.Data.LastUpdateTime = 0
 RaceServer.Flags = {}
+RaceServer.ScriptStartTime = GetGameTimer()
 
 function CheckUserRole(discordId, callback)
 	local url = string.format("%s/guilds/%s/members/%s", Config.Whitelist.Discord.api_url, Config.Whitelist.Discord.guild_id, discordId)
@@ -126,6 +127,7 @@ CreateServerCallback("custom_races:server:permission", function(player, callback
 		end
 		while isChecking or RaceServer.Data.IsUpdatingData do Citizen.Wait(0) end
 		if permission then
+			TriggerClientEvent("custom_races:client:info", playerId, #json.encode(RaceServer.Data.Front) * 1.02)
 			callback(true, clientOutdated and RaceServer.Data.Front or nil, nil)
 		else
 			local cooldownTime = RaceServer.CooldownLicenses[identifier]
@@ -135,6 +137,7 @@ CreateServerCallback("custom_races:server:permission", function(player, callback
 					Citizen.Wait(1000 * 60 * 10)
 					RaceServer.CooldownLicenses[identifier] = nil
 				end)
+				TriggerClientEvent("custom_races:client:info", playerId, #json.encode(RaceServer.Data.Front) * 1.02)
 				callback(true, clientOutdated and RaceServer.Data.Front or nil, nil)
 			else
 				callback(false, nil, math.floor((1000 * 60 * 10 - (GetGameTimer() - cooldownTime)) / 1000))
@@ -217,7 +220,7 @@ RegisterNetEvent("custom_races:server:createRace", function(data)
 							break
 						end
 					end
-					if allLoaded or (currentRoom.startTime and (GetGameTimer() - currentRoom.startTime >= 30000)) then
+					if allLoaded or (currentRoom.startTime and (GetGameTimer() - currentRoom.startTime >= currentRoom.timeOut)) then
 						for k, v in pairs(currentRoom.players) do
 							TriggerClientEvent("custom_races:client:startRace", v.src)
 						end
@@ -566,13 +569,13 @@ RegisterNetEvent("custom_races:server:leaveRace", function()
 	end
 end)
 
-RegisterNetEvent("custom_races:server:spawnVehicle", function(vehNetId)
+RegisterNetEvent("custom_races:server:spawnVehicle", function(netId)
 	local playerId = tonumber(source)
-	RaceServer.SpawnedVehicles[playerId] = vehNetId
+	RaceServer.SpawnedVehicles[playerId] = netId
 end)
 
-RegisterNetEvent("custom_races:server:deleteVehicle", function(vehId)
-	local vehicle = NetworkGetEntityFromNetworkId(vehId)
+RegisterNetEvent("custom_races:server:deleteVehicle", function(netId)
+	local vehicle = NetworkGetEntityFromNetworkId(netId)
 	Citizen.CreateThread(function()
 		-- This will fix "Execution of native 00000000faa3d236 in script host failed" error
 		-- Sometimes it happens lol, with a probability of 0.000000000001%
@@ -585,16 +588,16 @@ end)
 
 AddEventHandler("playerDropped", function()
 	local playerId = tonumber(source)
-	local vehNetId = RaceServer.SpawnedVehicles[playerId]
-	if vehNetId then
+	local netId = RaceServer.SpawnedVehicles[playerId]
+	if netId then
 		Citizen.CreateThread(function()
 			-- This will fix "Execution of native 00000000faa3d236 in script host failed" error
 			-- Sometimes it happens lol, with a probability of 0.000000000001%
 			-- If the vehicle exists, delete it
 			local attempt = 0
-			while DoesEntityExist(NetworkGetEntityFromNetworkId(vehNetId)) and (attempt < 10) do
+			while DoesEntityExist(NetworkGetEntityFromNetworkId(netId)) and (attempt < 10) do
 				attempt = attempt + 1
-				DeleteEntity(NetworkGetEntityFromNetworkId(vehNetId))
+				DeleteEntity(NetworkGetEntityFromNetworkId(netId))
 				Citizen.Wait(200)
 			end
 		end)
@@ -612,24 +615,20 @@ AddEventHandler("playerDropped", function()
 	end
 end)
 
-AddEventHandler("onResourceStart", function(resourceName)
-	if (GetCurrentResourceName() == resourceName) then
-		Citizen.CreateThread(function()
-			Citizen.Wait(2000)
-			local version = GetResourceMetadata(GetCurrentResourceName(), "version", 0)
-			if not string.find(version, "dev") then
-				PerformHttpRequest("https://raw.githubusercontent.com/taoletsgo/custom_races/refs/heads/main/main%20script/version_check.json", function(err, updatedata, headers)
-					if updatedata ~= nil then
-						local data = json.decode(updatedata)
-						if data.custom_races ~= version then
-							print("^1=======================================================================================^0")
-							print("^1(" .. GetCurrentResourceName() .. ") is outdated!^0")
-							print("Latest version: (^2" .. data.custom_races .. "^0) https://github.com/taoletsgo/custom_races/releases/")
-							print("^1=======================================================================================^0")
-						end
-					end
-				end, "GET", "")
+Citizen.CreateThread(function()
+	Citizen.Wait(2000)
+	local version = GetResourceMetadata(GetCurrentResourceName(), "version", 0)
+	if not string.find(version, "dev") then
+		PerformHttpRequest("https://raw.githubusercontent.com/taoletsgo/custom_races/refs/heads/main/main%20script/version_check.json", function(err, updatedata, headers)
+			if updatedata ~= nil then
+				local data = json.decode(updatedata)
+				if data.custom_races ~= version then
+					print("^1=======================================================================================^0")
+					print("^1(" .. GetCurrentResourceName() .. ") is outdated!^0")
+					print("Latest version: (^2" .. data.custom_races .. "^0) https://github.com/taoletsgo/custom_races/releases/")
+					print("^1=======================================================================================^0")
+				end
 			end
-		end)
+		end, "GET", "")
 	end
 end)

@@ -1,91 +1,16 @@
-function CreatePropForRace(hash, x, y, z, rotX, rotY, rotZ, color, prpsba)
-	if IsModelInCdimage(hash) and IsModelValid(hash) then
-		RequestModel(hash)
-		while not HasModelLoaded(hash) do
-			if status == "leaving" or status == "ending" or status == "freemode" then return nil end
-			Citizen.Wait(0)
-		end
-		local obj = CreateObjectNoOffset(hash, x, y, z, false, true, false)
-		-- Create object of door type
-		-- https://docs.fivem.net/natives/?_0x9A294B2138ABB884
-		if obj == 0 then
-			obj = CreateObjectNoOffset(hash, x, y, z, false, true, true)
-		end
-		if obj ~= 0 then
-			SetEntityRotation(obj, rotX or 0.0, rotY or 0.0, rotZ or 0.0, 2, 0)
-			SetObjectTextureVariation(obj, color or 0)
-			if speedUpObjects[hash] then
-				local speed = 25
-				if prpsba == 1 then
-					speed = 15
-				elseif prpsba == 2 then
-					speed = 25
-				elseif prpsba == 3 then
-					speed = 35
-				elseif prpsba == 4 then
-					speed = 45
-				elseif prpsba == 5 then
-					speed = 100
-				end
-				local duration = 0.4
-				if prpsba == 1 then
-					duration = 0.3
-				elseif prpsba == 2 then
-					duration = 0.4
-				elseif prpsba == 3 then
-					duration = 0.5
-				elseif prpsba == 4 then
-					duration = 0.5
-				elseif prpsba == 5 then
-					duration = 0.5
-				end
-				SetObjectStuntPropSpeedup(obj, speed)
-				SetObjectStuntPropDuration(obj, duration)
-			end
-			if slowDownObjects[hash] then
-				local speed = 30
-				if prpsba == 1 then
-					speed = 44
-				elseif prpsba == 2 then
-					speed = 30
-				elseif prpsba == 3 then
-					speed = 16
-				end
-				SetObjectStuntPropSpeedup(obj, speed)
-			end
-			if hash == GetHashKey("stt_prop_hoop_small_01") then
-				RequestNamedPtfxAsset("core")
-				while not HasNamedPtfxAssetLoaded("core") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("core")
-				StartParticleFxLoopedOnEntity("ent_amb_fire_ring", obj, 0.0, 0.0, 4.5, 0.0, 0.0, 90.0, 3.5, false, false, false)
-			elseif hash == GetHashKey("ar_prop_ar_hoop_med_01") then
-				RequestNamedPtfxAsset("scr_stunts")
-				while not HasNamedPtfxAssetLoaded("scr_stunts") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("scr_stunts")
-				StartParticleFxLoopedOnEntity("scr_stunts_fire_ring", obj, 0.0, 0.0, 11.5, -2.0, 0.0, 0.0, 0.47, false, false, false)
-			elseif hash == GetHashKey("stt_prop_hoop_constraction_01a") then
-				RequestNamedPtfxAsset("scr_stunts")
-				while not HasNamedPtfxAssetLoaded("scr_stunts") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("scr_stunts")
-				StartParticleFxLoopedOnEntity("scr_stunts_fire_ring", obj, 0.0, 0.0, 25.0, -12.5, 0.0, 0.0, 1.0, false, false, false)
-			end
-			if status == "leaving" or status == "ending" or status == "freemode" then
-				DeleteObject(obj)
-				return nil
-			else
-				return obj
-			end
-		else
-			return nil
+function GetModelDimensionsInCaches(hash)
+	if not dimensions.min[hash] or not dimensions.max[hash] then
+		if IsModelInCdimage(hash) and IsModelValid(hash) then
+			RequestModel(hash)
+			while not HasModelLoaded(hash) do Citizen.Wait(0) end
+			local min, max = GetModelDimensions(hash)
+			dimensions.min[hash] = min
+			dimensions.max[hash] = max
+			dimensions.radius[hash] = math.sqrt((max.x - min.x)^2 + (max.y - min.y)^2 + (max.z - min.z)^2) * 0.5
+			SetModelAsNoLongerNeeded(hash)
 		end
 	end
-	return nil
+	return dimensions.min[hash] or vector3(0.0, 0.0, 0.0), dimensions.max[hash] or vector3(0.0, 0.0, 0.0), dimensions.radius[hash] or 0.0
 end
 
 function DisplayCustomMsgs(msg, instantDelete, oldMsgItem)
@@ -186,8 +111,22 @@ function TrimedValue(value)
 	end
 end
 
-function GetValidZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
+function GetValidXYZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
+	local x_valid = posX
+	local y_valid = posY
 	local z_valid = 0.0
+	if x_valid <= -16000.0 or x_valid >= 16000.0 then
+		x_valid = 0.0
+		if not forCreate and printLog then
+			print("Failed to set player coords at the specified x. Please ensure the x is between -16000 and 16000")
+		end
+	end
+	if y_valid <= -16000.0 or y_valid >= 16000.0 then
+		y_valid = 0.0
+		if not forCreate and printLog then
+			print("Failed to set player coords at the specified y. Please ensure the y is between -16000 and 16000")
+		end
+	end
 	if forCreate and (posZ + 50.0 > -198.99) and (posZ + 50.0 <= 2698.99) then
 		z_valid = posZ + 50.0
 	elseif forCreate and (posZ - 50.0 > -198.99) and (posZ - 50.0 <= 2698.99) then
@@ -195,13 +134,13 @@ function GetValidZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
 	elseif not forCreate and (posZ > -198.99) and (posZ <= 2698.99) then
 		z_valid = posZ
 	else
-		local found, groundZ = GetGroundZFor_3dCoord(posX, posY, posZ, true)
+		local found, groundZ = GetGroundZFor_3dCoord(x_valid, y_valid, posZ, true)
 		z_valid = found and (groundZ > -198.99) and (groundZ <= 2698.99) and groundZ or 0.0
 		if not forCreate and printLog then
-			print("Failed to set player coords at the specified height. Please ensure the height is between -199 and 2699")
+			print("Failed to set player coords at the specified z. Please ensure the z is between -199 and 2699")
 		end
 	end
-	return z_valid
+	return x_valid, y_valid, z_valid
 end
 
 -- copyright @ https://github.com/esx-framework/esx_core/tree/1.10.2

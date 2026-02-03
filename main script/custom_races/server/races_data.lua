@@ -111,11 +111,8 @@ CreateServerCallback("custom_races:server:getBestTimes", function(player, callba
 	callback(besttimes)
 end)
 
-CreateServerCallback("custom_races:server:getRacesData", function(player, callback)
-	while RaceServer.Data.IsUpdatingData do
-		Citizen.Wait(0)
-	end
-	callback(RaceServer.Data.Front)
+CreateServerCallback("custom_races:server:getScriptStartTime", function(player, callback)
+	callback(RaceServer.ScriptStartTime)
 end)
 
 CreateServerCallback("custom_races:server:searchUGC", function(player, callback, url, ugc_img, ugc_json)

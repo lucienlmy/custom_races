@@ -11,6 +11,6 @@ RegisterNetEvent("custom_races:server:callback", function(eventName, requestId, 
 	local playerName = GetPlayerName(playerId)
 	if not serverCallbacks[eventName] or not playerName then return end
 	serverCallbacks[eventName]({src = playerId, name = playerName}, function(...)
-		TriggerClientEvent("custom_races:client:callback", playerId, requestId, ...)
+		TriggerLatentClientEvent("custom_races:client:callback", playerId, 65536, requestId, ...)
 	end, ...)
 end)

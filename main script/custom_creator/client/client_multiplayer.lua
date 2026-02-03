@@ -1,6 +1,6 @@
 inSession = false
 myServerId = 0
-uniqueId = 0
+globalUniqueId = 0
 lockSession = false
 hasStartSyncPreview = false
 
@@ -55,29 +55,27 @@ function LoadSessionData(data, data_2)
 	end
 	fixtureIndex = #currentRace.fixtures
 	for k, v in pairs(currentRace.objects) do
-		local newObject = CreatePropForCreator(v.hash, v.x, v.y, v.z, v.rotX, v.rotY, v.rotZ, v.color, v.prpsba)
-		if v.visible then
-			ResetEntityAlpha(newObject)
+		v.handle = nil
+		local gx = math.floor(v.x / 100.0)
+		local gy = math.floor(v.y / 100.0)
+		objectPool.grids[gx] = objectPool.grids[gx] or {}
+		objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+		objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = v
+		objectPool.all[v.uniqueId] = gx .. "-" .. gy
+		if effectObjects[v.hash] then
+			objectPool.effects[v.uniqueId] = {ptfxHandle == nil, object = v, style = effectObjects[v.hash]}
 		end
-		if not v.collision then
-			SetEntityCollision(newObject, false, false)
-		end
-		v.handle = newObject
 	end
 	objectIndex = #currentRace.objects
-	blips.objects = {}
-	for k, v in pairs(currentRace.objects) do
-		blips.objects[k] = CreateBlipForCreator(v.x, v.y, v.z, 0.60, 271, 50, v.handle)
-	end
 	if currentRace.startingGrid[1] then
 		local default_vehicle = currentRace.default_class and currentRace.available_vehicles[currentRace.default_class] and currentRace.available_vehicles[currentRace.default_class].index and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index] and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index].model or currentRace.test_vehicle
 		local model = tonumber(default_vehicle) or GetHashKey(default_vehicle)
-		local min, max = GetModelDimensions(model)
+		local min, max = GetModelDimensionsInCaches(model)
 		cameraPosition = vector3(currentRace.startingGrid[1].x + (20.0 - min.z) * math.sin(math.rad(currentRace.startingGrid[1].heading)), currentRace.startingGrid[1].y - (20.0 - min.z) * math.cos(math.rad(currentRace.startingGrid[1].heading)), currentRace.startingGrid[1].z + (20.0 - min.z))
 		cameraRotation = {x = -45.0, y = 0.0, z = currentRace.startingGrid[1].heading}
 	elseif currentRace.objects[1] then
 		local model = tonumber(currentRace.objects[1].hash) or GetHashKey(currentRace.objects[1].hash)
-		local min, max = GetModelDimensions(model)
+		local min, max = GetModelDimensionsInCaches(model)
 		cameraPosition = vector3(currentRace.objects[1].x + (20.0 - min.z) * math.sin(math.rad(currentRace.objects[1].rotZ)), currentRace.objects[1].y - (20.0 - min.z) * math.cos(math.rad(currentRace.objects[1].rotZ)), currentRace.objects[1].z + (20.0 - min.z))
 		cameraRotation = {x = -45.0, y = 0.0, z = currentRace.objects[1].rotZ}
 	end
@@ -377,8 +375,11 @@ function ReceiveCreatorPreview(data)
 				if old_obj and DoesEntityExist(old_obj) then
 					DeleteObject(old_obj)
 				end
-				local new_obj = CreatePropForCreator(data.hash, data.x, data.y, data.z, data.rotX, data.rotY, data.rotZ, data.color, data.prpsba)
+				local new_obj = CreatePropForCreator(data.hash, data.x, data.y, data.z, data.rotX, data.rotY, data.rotZ, data.color)
+				SetEntityAlpha(new_obj, 150)
+				SetEntityLodDist(new_obj, 16960)
 				SetEntityCollision(new_obj, false, false)
+				FreezeEntityPosition(new_obj, true)
 				v.objectPreview = new_obj
 				Citizen.CreateThread(function()
 					Citizen.Wait(300)
@@ -409,7 +410,7 @@ RegisterNetEvent("custom_creator:client:receiveInvitation", function(title, sess
 end)
 
 RegisterNetEvent("custom_creator:client:playerJoinSession", function(playerName, id)
-	if not global_var.enableCreator or not inSession then return end
+	if not global_var.enableCreator then return end
 	lockSession = true
 	table.insert(multiplayer.loadingPlayers, id)
 	table.insert(multiplayer.inSessionPlayers, { playerId = id, playerName = playerName })
@@ -417,14 +418,16 @@ RegisterNetEvent("custom_creator:client:playerJoinSession", function(playerName,
 	Citizen.CreateThread(function()
 		Citizen.Wait(10000)
 		while lockSession do
-			DisplayCustomMsgs(string.format(GetTranslate("join-session-wait"), playerName or id))
+			if global_var.status == "" then
+				DisplayCustomMsgs(string.format(GetTranslate("join-session-wait"), playerName or id))
+			end
 			Citizen.Wait(10000)
 		end
 	end)
 end)
 
 RegisterNetEvent("custom_creator:client:loadDone", function(id)
-	if not global_var.enableCreator or not inSession then return end
+	if not global_var.enableCreator then return end
 	for k, v in pairs(multiplayer.loadingPlayers) do
 		if v == id then
 			table.remove(multiplayer.loadingPlayers, k)
@@ -437,7 +440,7 @@ RegisterNetEvent("custom_creator:client:loadDone", function(id)
 end)
 
 RegisterNetEvent("custom_creator:client:playerLeaveSession", function(playerName, id)
-	if not global_var.enableCreator or not inSession then return end
+	if not global_var.enableCreator then return end
 	for k, v in pairs(multiplayer.loadingPlayers) do
 		if v == id then
 			table.remove(multiplayer.loadingPlayers, k)
@@ -635,37 +638,20 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		ReceiveCreatorPreview(data)
 	elseif str == "objects-place" then
 		if (type(data) ~= "table") then return end
-		data.handle = CreatePropForCreator(data.hash, data.x, data.y, data.z, data.rotX, data.rotY, data.rotZ, data.color, data.prpsba)
-		if global_var.enableTest then
-			if data.dynamic then
-				FreezeEntityPosition(data.handle, false)
-			else
-				FreezeEntityPosition(data.handle, true)
-			end
-			if not data.visible then
-				SetEntityVisible(data.handle, false)
-			end
-		else
-			FreezeEntityPosition(data.handle, true)
-			if not data.visible then
-				SetEntityAlpha(data.handle, 150)
-			end
+		local object = data
+		object.handle = nil
+		local gx = math.floor(object.x / 100.0)
+		local gy = math.floor(object.y / 100.0)
+		objectPool.grids[gx] = objectPool.grids[gx] or {}
+		objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+		objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+		objectPool.all[object.uniqueId] = gx .. "-" .. gy
+		if effectObjects[object.hash] then
+			objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 		end
-		if data.visible then
-			ResetEntityAlpha(data.handle)
-			SetEntityVisible(data.handle, true)
-		end
-		if data.collision then
-			SetEntityCollision(data.handle, true, true)
-		else
-			SetEntityCollision(data.handle, false, false)
-		end
-		table.insert(currentRace.objects, TableDeepCopy(data))
+		currentRace.objects[#currentRace.objects + 1] = object
 		if objectIndex == 0 and #currentRace.objects > 0 then
 			objectIndex = #currentRace.objects
-		end
-		if not global_var.enableTest then
-			UpdateBlipForCreator("object")
 		end
 		if playerName then
 			DisplayCustomMsgs(string.format(GetTranslate("objects-place"), playerName, data.hash, data.x, data.y, data.z))
@@ -674,77 +660,20 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		if (type(data) ~= "table") then return end
 		for k, v in pairs(currentRace.objects) do
 			if v.uniqueId == data.uniqueId then
-				data.handle = v.handle
-				currentRace.objects[k] = TableDeepCopy(data)
-				if isPropPickedUp and currentObject.uniqueId == data.uniqueId then
-					currentObject = TableDeepCopy(data)
-				end
-				SetEntityCoordsNoOffset(data.handle, data.x, data.y, data.z)
-				SetEntityRotation(data.handle, data.rotX, data.rotY, data.rotZ, 2, 0)
-				SetObjectTextureVariation(data.handle, data.color)
-				if speedUpObjects[data.hash] then
-					local speed = 25
-					if data.prpsba == 1 then
-						speed = 15
-					elseif data.prpsba == 2 then
-						speed = 25
-					elseif data.prpsba == 3 then
-						speed = 35
-					elseif data.prpsba == 4 then
-						speed = 45
-					elseif data.prpsba == 5 then
-						speed = 100
-					end
-					local duration = 0.4
-					if data.prpsba == 1 then
-						duration = 0.3
-					elseif data.prpsba == 2 then
-						duration = 0.4
-					elseif data.prpsba == 3 then
-						duration = 0.5
-					elseif data.prpsba == 4 then
-						duration = 0.5
-					elseif data.prpsba == 5 then
-						duration = 0.5
-					end
-					SetObjectStuntPropSpeedup(obj, speed)
-					SetObjectStuntPropDuration(obj, duration)
-				end
-				if slowDownObjects[data.hash] then
-					local speed = 30
-					if data.prpsba == 1 then
-						speed = 44
-					elseif data.prpsba == 2 then
-						speed = 30
-					elseif data.prpsba == 3 then
-						speed = 16
-					end
-					SetObjectStuntPropSpeedup(obj, speed)
-				end
-				if global_var.enableTest then
-					if data.dynamic then
-						FreezeEntityPosition(data.handle, false)
-					else
-						FreezeEntityPosition(data.handle, true)
-					end
-					if not data.visible then
-						SetEntityVisible(data.handle, false)
-					end
-				else
-					FreezeEntityPosition(data.handle, true)
-					if not data.visible then
-						SetEntityAlpha(data.handle, 150)
-					end
-				end
-				if data.visible then
-					ResetEntityAlpha(data.handle)
-					SetEntityVisible(data.handle, true)
-				end
-				if data.collision then
-					SetEntityCollision(data.handle, true, true)
-				else
-					SetEntityCollision(data.handle, false, false)
-				end
+				v.modificationCount = data.modificationCount
+				v.hash = data.hash
+				v.x = data.x
+				v.y = data.y
+				v.z = data.z
+				v.rotX = data.rotX
+				v.rotY = data.rotY
+				v.rotZ = data.rotZ
+				v.color = data.color
+				v.prpsba = data.prpsba
+				v.visible = data.visible
+				v.collision = data.collision
+				v.dynamic = data.dynamic
+				objectPool.changedObjects[v.uniqueId] = true
 				break
 			end
 		end
@@ -755,14 +684,24 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 				if playerName then
 					DisplayCustomMsgs(string.format(GetTranslate("objects-delete"), playerName, k, v.hash, v.x, v.y, v.z))
 				end
-				DeleteObject(v.handle)
+				objectPool.all[v.uniqueId] = nil
+				objectPool.effects[v.uniqueId] = nil
+				local gx = math.floor(v.x / 100.0)
+				local gy = math.floor(v.y / 100.0)
+				if objectPool.grids[gx] and objectPool.grids[gx][gy] then
+					for i, object in pairs(objectPool.grids[gx][gy]) do
+						if v.uniqueId == object.uniqueId then
+							table.remove(objectPool.grids[gx][gy], i)
+							break
+						end
+					end
+				end
 				table.remove(currentRace.objects, k)
 				break
 			end
 		end
 		if isPropPickedUp then
 			if currentObject.uniqueId == data.uniqueId then
-				objectSelect = nil
 				isPropPickedUp = false
 				ResetGlobalVariable("currentObject")
 			else
@@ -777,41 +716,21 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		if objectIndex > #currentRace.objects then
 			objectIndex = #currentRace.objects
 		end
-		if not global_var.enableTest then
-			UpdateBlipForCreator("object")
-		end
 	elseif str == "template-place" then
 		if (type(data) ~= "table") then return end
 		for i = 1, #data do
-			data[i].handle = CreatePropForCreator(data[i].hash, data[i].x, data[i].y, data[i].z, data[i].rotX, data[i].rotY, data[i].rotZ, data[i].color, data[i].prpsba)
-			if global_var.enableTest then
-				if data[i].dynamic then
-					FreezeEntityPosition(data[i].handle, false)
-				else
-					FreezeEntityPosition(data[i].handle, true)
-				end
-				if not data[i].visible then
-					SetEntityVisible(data[i].handle, false)
-				end
-			else
-				FreezeEntityPosition(data[i].handle, true)
-				if not data[i].visible then
-					SetEntityAlpha(data[i].handle, 150)
-				end
+			local object = data[i]
+			object.handle = nil
+			local gx = math.floor(object.x / 100.0)
+			local gy = math.floor(object.y / 100.0)
+			objectPool.grids[gx] = objectPool.grids[gx] or {}
+			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.all[object.uniqueId] = gx .. "-" .. gy
+			if effectObjects[object.hash] then
+				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 			end
-			if data[i].visible then
-				ResetEntityAlpha(data[i].handle)
-				SetEntityVisible(data[i].handle, true)
-			end
-			if data[i].collision then
-				SetEntityCollision(data[i].handle, true, true)
-			else
-				SetEntityCollision(data[i].handle, false, false)
-			end
-			table.insert(currentRace.objects, TableDeepCopy(data[i]))
-		end
-		if not global_var.enableTest then
-			UpdateBlipForCreator("object")
+			currentRace.objects[#currentRace.objects + 1] = object
 		end
 		if playerName then
 			DisplayCustomMsgs(string.format(GetTranslate("template-place"), playerName, #data))
@@ -840,14 +759,10 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 			v.x = RoundedValue(v.x + data.offset_x, 3)
 			v.y = RoundedValue(v.y + data.offset_y, 3)
 			v.z = RoundedValue(v.z + data.offset_z, 3)
-			if v.uniqueId == currentObject.uniqueId then
-				currentObject = TableDeepCopy(v)
-			end
-			SetEntityCoordsNoOffset(v.handle, v.x, v.y, v.z)
+			objectPool.changedObjects[v.uniqueId] = true
 		end
 		if not global_var.enableTest then
 			UpdateBlipForCreator("checkpoint")
-			UpdateBlipForCreator("object")
 		else
 			if global_var.tipsRendered then
 				ResetCheckpointAndBlipForTest()

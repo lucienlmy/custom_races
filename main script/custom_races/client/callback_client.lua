@@ -5,7 +5,7 @@ local serverRequests = {}
 
 TriggerServerCallback = function(eventName, callback, ...)
 	serverRequests[RequestId] = callback
-	TriggerServerEvent("custom_races:server:callback", eventName, RequestId, ...)
+	TriggerLatentServerEvent("custom_races:server:callback", 65536, eventName, RequestId, ...)
 	RequestId = RequestId + 1
 end
 

@@ -8,6 +8,11 @@ local vehicleList = {
 favoriteVehicles = {}
 personalVehicles = {}
 races_data_front = {}
+dimensions = {
+	min = {},
+	max = {},
+	radius = {}
+}
 
 speedUpObjects = {
 	[GetHashKey("stt_prop_track_speedup")] = true,
@@ -132,6 +137,12 @@ noCollisionObjects = {
 	[GetHashKey("ar_prop_ar_checkpoint_crn_30d")] = true,
 	[GetHashKey("ar_prop_ar_checkpoint_crn02")] = true,
 	[GetHashKey("ar_prop_ar_checkpoint_fork")] = true
+}
+
+effectObjects = {
+	[GetHashKey("stt_prop_hoop_small_01")] = 1,
+	[GetHashKey("ar_prop_ar_hoop_med_01")] = 2,
+	[GetHashKey("stt_prop_hoop_constraction_01a")] = 3
 }
 
 -- copyright @ JoraEmin52's modTool
@@ -320,28 +331,17 @@ availableWeapons = {
 }
 
 Citizen.CreateThread(function()
-	while not hasNUILoaded do Citizen.Wait(0) end
-	TriggerServerCallback("custom_races:server:getRacesData", function(result)
-		local valid = false
-		if type(result) == "table" then
-			for k, v in pairs(result) do
-				if #v > 0 then
-					valid = true
-					break
-				end
-			end
-			if not valid then
-				print("Error: Contact the server admin to add/create the race tracks")
-				dataOutdated = true
-			end
-		end
-		races_data_front = valid and result or {}
-		status = "freemode"
+	while not NetworkIsSessionStarted() do Citizen.Wait(0) end
+	TriggerServerCallback("custom_races:server:getScriptStartTime", function(gameTimer)
+		timeServerSide["scriptStartTime"] = gameTimer
 	end)
 end)
 
+RegisterNetEvent("custom_races:client:info", function(len)
+	dataLen = len
+end)
+
 RegisterNetEvent("custom_races:client:dataOutdated", function()
-	while status == "" do Citizen.Wait(0) end
 	dataOutdated = true
 end)
 

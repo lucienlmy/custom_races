@@ -4,18 +4,10 @@ RegisterNetEvent("custom_creator:server:saveData", function(data)
 	local identifier_license = GetPlayerIdentifierByType(playerId, "license")
 	local currentCreator = CreatorServer.Creators[playerId]
 	if identifier_license and playerName and currentCreator and data and type(data) == "table" then
-		if data.DisableNpcChecked ~= nil then
-			if data.DisableNpcChecked then
-				currentCreator.preferences.DisableNpcChecked = 1
-			else
-				currentCreator.preferences.DisableNpcChecked = 0
-			end
-		end
-		if data.ObjectLowerAlphaChecked ~= nil then
-			if data.ObjectLowerAlphaChecked then
-				currentCreator.preferences.ObjectLowerAlphaChecked = 1
-			else
-				currentCreator.preferences.ObjectLowerAlphaChecked = 0
+		local preferencesKeys = {"DisableNpcChecked", "ObjectLowerAlphaChecked"}
+		for key, _ in pairs(CreatorServer.DefaultPreferences) do
+			if data[key] ~= nil then
+				currentCreator.preferences[key] = data[key] and 1 or 0
 			end
 		end
 		if data.template ~= nil then
@@ -46,13 +38,13 @@ RegisterNetEvent("custom_creator:server:cancel", function()
 	CreatorServer.SearchStatus[playerId] = nil
 end)
 
-RegisterNetEvent("custom_creator:server:spawnVehicle", function(vehNetId)
+RegisterNetEvent("custom_creator:server:spawnVehicle", function(netId)
 	local playerId = tonumber(source)
-	CreatorServer.SpawnedVehicles[playerId] = vehNetId
+	CreatorServer.SpawnedVehicles[playerId] = netId
 end)
 
-RegisterNetEvent("custom_creator:server:deleteVehicle", function(vehId)
-	local vehicle = NetworkGetEntityFromNetworkId(vehId)
+RegisterNetEvent("custom_creator:server:deleteVehicle", function(netId)
+	local vehicle = NetworkGetEntityFromNetworkId(netId)
 	Citizen.CreateThread(function()
 		-- This will fix "Execution of native 00000000faa3d236 in script host failed" error
 		-- Sometimes it happens lol, with a probability of 0.000000000001%
@@ -66,16 +58,16 @@ end)
 AddEventHandler("playerDropped", function()
 	local playerId = tonumber(source)
 	local playerName = GetPlayerName(playerId)
-	local vehNetId = CreatorServer.SpawnedVehicles[playerId]
-	if vehNetId then
+	local netId = CreatorServer.SpawnedVehicles[playerId]
+	if netId then
 		Citizen.CreateThread(function()
 			-- This will fix "Execution of native 00000000faa3d236 in script host failed" error
 			-- Sometimes it happens lol, with a probability of 0.000000000001%
 			-- If the vehicle exists, delete it
 			local attempt = 0
-			while DoesEntityExist(NetworkGetEntityFromNetworkId(vehNetId)) and (attempt < 10) do
+			while DoesEntityExist(NetworkGetEntityFromNetworkId(netId)) and (attempt < 10) do
 				attempt = attempt + 1
-				DeleteEntity(NetworkGetEntityFromNetworkId(vehNetId))
+				DeleteEntity(NetworkGetEntityFromNetworkId(netId))
 				Citizen.Wait(200)
 			end
 		end)
@@ -226,12 +218,12 @@ CreateServerCallback("custom_creator:server:getData", function(player, callback)
 		class = "filter-races",
 		data = {}
 	}
-	if currentCreator.preferences.DisableNpcChecked == nil then
-		currentCreator.preferences.DisableNpcChecked = 0
+	for key, bool in pairs(CreatorServer.DefaultPreferences) do
+		if currentCreator.preferences[key] == nil then
+			currentCreator.preferences[key] = bool and 1 or 0
+		end
 	end
-	if currentCreator.preferences.ObjectLowerAlphaChecked == nil then
-		currentCreator.preferences.ObjectLowerAlphaChecked = 1
-	end
+	TriggerClientEvent("custom_creator:client:info", playerId, "track-list", #json.encode(result) * 1.02)
 	callback(result, currentCreator)
 end)
 
@@ -292,6 +284,7 @@ CreateServerCallback("custom_creator:server:getJson", function(player, callback,
 							return string.lower(a.playerName) < string.lower(b.playerName)
 						end)
 					end
+					TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(currentSession.data) * 1.02)
 					callback(currentSession.data, currentSession.modificationCount, inSessionPlayers)
 				else
 					CreatorServer.Sessions[raceid] = {
@@ -326,7 +319,13 @@ CreateServerCallback("custom_creator:server:getJson", function(player, callback,
 							end
 							data.mission.gen.nm = path:match("([^/]+)%.json$")
 							data.contributors = nil
-							callback(data)
+							if CreatorServer.Creators[playerId] then
+								TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(data) * 1.02)
+								callback(data)
+							else
+								CreatorServer.Sessions[raceid] = nil
+								callback(false)
+							end
 						else
 							CreatorServer.Sessions[raceid] = nil
 							callback(false)
@@ -369,7 +368,13 @@ CreateServerCallback("custom_creator:server:getJson", function(player, callback,
 						end
 						data.mission.gen.nm = path:match("([^/]+)%.json$")
 						data.contributors = nil
-						callback(data)
+						if CreatorServer.Creators[playerId] then
+							TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(data) * 1.02)
+							callback(data)
+						else
+							CreatorServer.Sessions[raceid] = nil
+							callback(false)
+						end
 					else
 						CreatorServer.Sessions[raceid] = nil
 						callback(false)
@@ -434,7 +439,10 @@ CreateServerCallback("custom_creator:server:getUGC", function(player, callback, 
 			if ugc_json then
 				FindValidJson(url, "", 0, 99, playerId, function(data)
 					if data then
-						data.mission.gen.ownerid = playerName
+						if data.mission and data.mission.gen then
+							data.mission.gen.ownerid = playerName
+						end
+						TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(data) * 1.02)
 						callback(data, true)
 					else
 						CreatorServer.SearchStatus[playerId] = nil
@@ -465,7 +473,10 @@ CreateServerCallback("custom_creator:server:getUGC", function(player, callback, 
 								attempt = _attempt
 								lock = false
 								if data then
-									data.mission.gen.ownerid = playerName
+									if data.mission and data.mission.gen then
+										data.mission.gen.ownerid = playerName
+									end
+									TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(data) * 1.02)
 									callback(data, true)
 								end
 							end)

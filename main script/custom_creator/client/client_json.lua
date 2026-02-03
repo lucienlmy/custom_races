@@ -274,14 +274,12 @@ function ConvertDataFromUGC(data)
 		loc.y = loc.y or 0.0
 		loc.z = loc.z or 0.0
 		local head = data.mission.veh.head[i] or 0.0
-		local x = RoundedValue(loc.x, 3)
-		local y = RoundedValue(loc.y, 3)
-		local z = RoundedValue(loc.z, 3)
+		local x, y, z = GetValidXYZFor_3dCoord(RoundedValue(loc.x, 3), RoundedValue(loc.y, 3), RoundedValue(loc.z, 3), false, false)
 		currentRace.startingGrid[i] = {
 			handle = nil,
 			x = x,
 			y = y,
-			z = GetValidZFor_3dCoord(x, y, z, false, false),
+			z = z,
 			heading = RoundedValue(head, 3)
 		}
 	end
@@ -422,94 +420,117 @@ function ConvertDataFromUGC(data)
 		end
 	end
 	fixtureIndex = #currentRace.fixtures
+	local validModels = {}
 	local invalidObjects = {}
 	currentRace.objects = {}
 	for i = 1, data.mission.prop.no do
 		local model = data.mission.prop.model[i] or 779917859
-		local loc = data.mission.prop.loc[i] or {}
-		loc.x = loc.x or 0.0
-		loc.y = loc.y or 0.0
-		loc.z = loc.z or 0.0
-		local vRot = data.mission.prop.vRot[i] or {}
-		vRot.x = vRot.x or 0.0
-		vRot.y = vRot.y or 0.0
-		vRot.z = vRot.z or 0.0
-		local prpclr = data.mission.prop.prpclr[i] or 0
-		local pLODDist = data.mission.prop.pLODDist[i] or 16960
-		local collision = data.mission.prop.collision[i] or (not noCollisionObjects[model] and 1 or 0)
-		local prpbs = data.mission.prop.prpbs[i] or 0
-		local prpsba = data.mission.prop.prpsba[i] or 2
-		local object = {
-			uniqueId = nil,
-			modificationCount = nil,
-			hash = model,
-			handle = nil,
-			x = RoundedValue(loc.x, 3),
-			y = RoundedValue(loc.y, 3),
-			z = RoundedValue(loc.z, 3),
-			rotX = RoundedValue(vRot.x, 3),
-			rotY = RoundedValue(vRot.y, 3),
-			rotZ = RoundedValue(vRot.z, 3),
-			color = prpclr,
-			prpsba = prpsba,
-			visible = not IsBitSetValue(prpbs, 9) and (pLODDist ~= 1),
-			collision = collision == 1,
-			dynamic = false
-		}
-		object.handle = CreatePropForCreator(object.hash, object.x, object.y, object.z, object.rotX, object.rotY, object.rotZ, object.color, object.prpsba)
-		if object.handle then
-			if object.visible then
-				ResetEntityAlpha(object.handle)
+		if validModels[model] or (IsModelInCdimage(model) and IsModelValid(model)) then
+			validModels[model] = true
+			local loc = data.mission.prop.loc[i] or {}
+			loc.x = loc.x or 0.0
+			loc.y = loc.y or 0.0
+			loc.z = loc.z or 0.0
+			if loc.x <= -16000.0 or loc.x >= 16000.0 then
+				loc.x = 0.0
 			end
-			if not object.collision then
-				SetEntityCollision(object.handle, false, false)
+			if loc.y <= -16000.0 or loc.y >= 16000.0 then
+				loc.y = 0.0
 			end
-			uniqueId = uniqueId + 1
-			object.uniqueId = myServerId .. "-" .. uniqueId
-			object.modificationCount = 0
+			if loc.z <= -198.99 or loc.z > 2698.99 then
+				loc.z = 0.0
+			end
+			local vRot = data.mission.prop.vRot[i] or {}
+			vRot.x = vRot.x or 0.0
+			vRot.y = vRot.y or 0.0
+			vRot.z = vRot.z or 0.0
+			local prpclr = data.mission.prop.prpclr[i] or 0
+			local pLODDist = data.mission.prop.pLODDist[i] or 16960
+			local collision = data.mission.prop.collision[i] or (not noCollisionObjects[model] and 1 or 0)
+			local prpbs = data.mission.prop.prpbs[i] or 0
+			local prpsba = data.mission.prop.prpsba[i] or 2
+			globalUniqueId = globalUniqueId + 1
+			local object = {
+				uniqueId = myServerId .. "-" .. globalUniqueId,
+				modificationCount = 0,
+				hash = model,
+				handle = nil,
+				x = RoundedValue(loc.x, 3),
+				y = RoundedValue(loc.y, 3),
+				z = RoundedValue(loc.z, 3),
+				rotX = RoundedValue(vRot.x, 3),
+				rotY = RoundedValue(vRot.y, 3),
+				rotZ = RoundedValue(vRot.z, 3),
+				color = prpclr,
+				prpsba = prpsba,
+				visible = not IsBitSetValue(prpbs, 9) and (pLODDist ~= 1),
+				collision = collision == 1,
+				dynamic = false
+			}
+			local gx = math.floor(object.x / 100.0)
+			local gy = math.floor(object.y / 100.0)
+			objectPool.grids[gx] = objectPool.grids[gx] or {}
+			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.all[object.uniqueId] = gx .. "-" .. gy
+			if effectObjects[object.hash] then
+				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
+			end
 			currentRace.objects[#currentRace.objects + 1] = object
 		else
-			invalidObjects[object.hash] = true
+			invalidObjects[model] = true
 		end
 	end
 	for i = 1, data.mission.dprop.no do
 		local model = data.mission.dprop.model[i] or 779917859
-		local loc = data.mission.dprop.loc[i] or {}
-		loc.x = loc.x or 0.0
-		loc.y = loc.y or 0.0
-		loc.z = loc.z or 0.0
-		local vRot = data.mission.dprop.vRot[i] or {}
-		vRot.x = vRot.x or 0.0
-		vRot.y = vRot.y or 0.0
-		vRot.z = vRot.z or 0.0
-		local prpdclr = data.mission.dprop.prpdclr[i] or 0
-		local collision = data.mission.dprop.collision[i] or (not noCollisionObjects[model] and 1 or 0)
-		local object = {
-			uniqueId = nil,
-			modificationCount = nil,
-			hash = model,
-			handle = nil,
-			x = RoundedValue(loc.x, 3),
-			y = RoundedValue(loc.y, 3),
-			z = RoundedValue(loc.z, 3),
-			rotX = RoundedValue(vRot.x, 3),
-			rotY = RoundedValue(vRot.y, 3),
-			rotZ = RoundedValue(vRot.z, 3),
-			color = prpdclr,
-			prpsba = 2,
-			visible = true,
-			collision = collision == 1,
-			dynamic = true
-		}
-		object.handle = CreatePropForCreator(object.hash, object.x, object.y, object.z, object.rotX, object.rotY, object.rotZ, object.color, object.prpsba)
-		if object.handle then
-			ResetEntityAlpha(object.handle)
-			if not object.collision then
-				SetEntityCollision(object.handle, false, false)
+		if validModels[model] or (IsModelInCdimage(model) and IsModelValid(model)) then
+			validModels[model] = true
+			local loc = data.mission.dprop.loc[i] or {}
+			loc.x = loc.x or 0.0
+			loc.y = loc.y or 0.0
+			loc.z = loc.z or 0.0
+			if loc.x <= -16000.0 or loc.x >= 16000.0 then
+				loc.x = 0.0
 			end
-			uniqueId = uniqueId + 1
-			object.uniqueId = myServerId .. "-" .. uniqueId
-			object.modificationCount = 0
+			if loc.y <= -16000.0 or loc.y >= 16000.0 then
+				loc.y = 0.0
+			end
+			if loc.z <= -198.99 or loc.z > 2698.99 then
+				loc.z = 0.0
+			end
+			local vRot = data.mission.dprop.vRot[i] or {}
+			vRot.x = vRot.x or 0.0
+			vRot.y = vRot.y or 0.0
+			vRot.z = vRot.z or 0.0
+			local prpdclr = data.mission.dprop.prpdclr[i] or 0
+			local collision = data.mission.dprop.collision[i] or (not noCollisionObjects[model] and 1 or 0)
+			globalUniqueId = globalUniqueId + 1
+			local object = {
+				uniqueId = myServerId .. "-" .. globalUniqueId,
+				modificationCount = 0,
+				hash = model,
+				handle = nil,
+				x = RoundedValue(loc.x, 3),
+				y = RoundedValue(loc.y, 3),
+				z = RoundedValue(loc.z, 3),
+				rotX = RoundedValue(vRot.x, 3),
+				rotY = RoundedValue(vRot.y, 3),
+				rotZ = RoundedValue(vRot.z, 3),
+				color = prpdclr,
+				prpsba = 2,
+				visible = true,
+				collision = collision == 1,
+				dynamic = true
+			}
+			local gx = math.floor(object.x / 100.0)
+			local gy = math.floor(object.y / 100.0)
+			objectPool.grids[gx] = objectPool.grids[gx] or {}
+			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.all[object.uniqueId] = gx .. "-" .. gy
+			if effectObjects[object.hash] then
+				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
+			end
 			currentRace.objects[#currentRace.objects + 1] = object
 		else
 			invalidObjects[object.hash] = true
@@ -525,19 +546,15 @@ function ConvertDataFromUGC(data)
 		print("Or you can just ignore this message")
 	end
 	objectIndex = #currentRace.objects
-	blips.objects = {}
-	for k, v in pairs(currentRace.objects) do
-		blips.objects[k] = CreateBlipForCreator(v.x, v.y, v.z, 0.60, 271, 50, v.handle)
-	end
 	if currentRace.startingGrid[1] then
 		local default_vehicle = currentRace.default_class and currentRace.available_vehicles[currentRace.default_class] and currentRace.available_vehicles[currentRace.default_class].index and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index] and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index].model or currentRace.test_vehicle
 		local model = tonumber(default_vehicle) or GetHashKey(default_vehicle)
-		local min, max = GetModelDimensions(model)
+		local min, max = GetModelDimensionsInCaches(model)
 		cameraPosition = vector3(currentRace.startingGrid[1].x + (20.0 - min.z) * math.sin(math.rad(currentRace.startingGrid[1].heading)), currentRace.startingGrid[1].y - (20.0 - min.z) * math.cos(math.rad(currentRace.startingGrid[1].heading)), currentRace.startingGrid[1].z + (20.0 - min.z))
 		cameraRotation = {x = -45.0, y = 0.0, z = currentRace.startingGrid[1].heading}
 	elseif currentRace.objects[1] then
 		local model = tonumber(currentRace.objects[1].hash) or GetHashKey(currentRace.objects[1].hash)
-		local min, max = GetModelDimensions(model)
+		local min, max = GetModelDimensionsInCaches(model)
 		cameraPosition = vector3(currentRace.objects[1].x + (20.0 - min.z) * math.sin(math.rad(currentRace.objects[1].rotZ)), currentRace.objects[1].y - (20.0 - min.z) * math.cos(math.rad(currentRace.objects[1].rotZ)), currentRace.objects[1].z + (20.0 - min.z))
 		cameraRotation = {x = -45.0, y = 0.0, z = currentRace.objects[1].rotZ}
 	end
@@ -888,5 +905,6 @@ function ConvertDataToUGC()
 		})
 		table.insert(data.mission.veh.head, grid.heading)
 	end
+	DisplayBusyspinner("upload", #json.encode(data) * 1.02)
 	return data
 end

@@ -1,4 +1,4 @@
-RegisterNetEvent("custom_creator:server:createSession", function(raceid, data)
+RegisterNetEvent("custom_creator:server:createSession", function(raceid)
 	local playerId = tonumber(source)
 	local playerName = GetPlayerName(playerId)
 	local identifier_license = GetPlayerIdentifierByType(playerId, "license")
@@ -10,7 +10,7 @@ RegisterNetEvent("custom_creator:server:createSession", function(raceid, data)
 	CreatorServer.Sessions[raceid] = {
 		sessionId = raceid,
 		creators = { { playerId = playerId, identifier = identifier, playerName = playerName } },
-		data = data,
+		data = nil,
 		modificationCount = {
 			title = 0,
 			thumbnail = 0,
@@ -222,7 +222,6 @@ RegisterNetEvent("custom_creator:server:leaveSession", function(raceid)
 end)
 
 CreateServerCallback("custom_creator:server:sessionData", function(player, callback, raceid, data)
-	local playerId = player.src
 	local currentSession = CreatorServer.Sessions[raceid]
 	if currentSession then
 		currentSession.data = data
@@ -263,6 +262,7 @@ CreateServerCallback("custom_creator:server:joinPlayerSession", function(player,
 					return string.lower(a.playerName) < string.lower(b.playerName)
 				end)
 			end
+			TriggerClientEvent("custom_creator:client:info", playerId, "track-download", #json.encode(currentSession.data) * 1.02)
 			callback(currentSession.data, currentSession.modificationCount, inSessionPlayers)
 		else
 			CreatorServer.Sessions[sessionId] = nil

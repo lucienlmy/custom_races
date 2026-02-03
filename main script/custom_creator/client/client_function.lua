@@ -101,10 +101,25 @@ function GetEndXYInView(targetZ)
 	end
 end
 
+function GetModelDimensionsInCaches(hash)
+	if not dimensions.min[hash] or not dimensions.max[hash] then
+		if IsModelInCdimage(hash) and IsModelValid(hash) then
+			RequestModel(hash)
+			while not HasModelLoaded(hash) do Citizen.Wait(0) end
+			local min, max = GetModelDimensions(hash)
+			dimensions.min[hash] = min
+			dimensions.max[hash] = max
+			dimensions.radius[hash] = math.sqrt((max.x - min.x)^2 + (max.y - min.y)^2 + (max.z - min.z)^2) * 0.5
+			SetModelAsNoLongerNeeded(hash)
+		end
+	end
+	return dimensions.min[hash] or vector3(0.0, 0.0, 0.0), dimensions.max[hash] or vector3(0.0, 0.0, 0.0), dimensions.radius[hash] or 0.0
+end
+
 function DrawLineAlongBone(entity, hash, boneIndex)
 	local bonePos = GetWorldPositionOfEntityBone(entity, boneIndex)
 	local boneRot = GetEntityBoneRotation(entity, boneIndex)
-	local min, max = GetModelDimensions(hash)
+	local min, max = GetModelDimensionsInCaches(hash)
 	local dir = vector3(-math.sin(math.rad(boneRot.z)) * math.cos(math.rad(boneRot.x)), math.cos(math.rad(boneRot.z)) * math.cos(math.rad(boneRot.x)), math.sin(math.rad(boneRot.x)))
 	local len = (math.abs((max - min).x * dir.x) + math.abs((max - min).y * dir.y) + math.abs((max - min).z * dir.z)) * 0.75
 	local p1 = bonePos + dir * len
@@ -112,17 +127,17 @@ function DrawLineAlongBone(entity, hash, boneIndex)
 	DrawLine(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, 0, 255, 0, 255)
 end
 
-function DrawFixtureBoxes(fixture, hash, r, g, b)
-	local min, max = GetModelDimensions(hash)
+function DrawEntityBoxes(handle, hash, r, g, b, forDebug)
+	local min, max = GetModelDimensionsInCaches(hash)
 	local corners = {
-		GetOffsetFromEntityInWorldCoords(fixture, max.x, max.y, max.z),
-		GetOffsetFromEntityInWorldCoords(fixture, min.x, max.y, max.z),
-		GetOffsetFromEntityInWorldCoords(fixture, max.x, min.y, max.z),
-		GetOffsetFromEntityInWorldCoords(fixture, min.x, min.y, max.z),
-		GetOffsetFromEntityInWorldCoords(fixture, max.x, max.y, min.z),
-		GetOffsetFromEntityInWorldCoords(fixture, min.x, max.y, min.z),
-		GetOffsetFromEntityInWorldCoords(fixture, max.x, min.y, min.z),
-		GetOffsetFromEntityInWorldCoords(fixture, min.x, min.y, min.z)
+		GetOffsetFromEntityInWorldCoords(handle, max.x, max.y, max.z),
+		GetOffsetFromEntityInWorldCoords(handle, min.x, max.y, max.z),
+		GetOffsetFromEntityInWorldCoords(handle, max.x, min.y, max.z),
+		GetOffsetFromEntityInWorldCoords(handle, min.x, min.y, max.z),
+		GetOffsetFromEntityInWorldCoords(handle, max.x, max.y, min.z),
+		GetOffsetFromEntityInWorldCoords(handle, min.x, max.y, min.z),
+		GetOffsetFromEntityInWorldCoords(handle, max.x, min.y, min.z),
+		GetOffsetFromEntityInWorldCoords(handle, min.x, min.y, min.z)
 	}
 	local lines = {
 		{1, 2}, {2, 4}, {4, 3}, {3, 1},
@@ -133,21 +148,23 @@ function DrawFixtureBoxes(fixture, hash, r, g, b)
 		local p1, p2 = corners[line[1]], corners[line[2]]
 		DrawLine(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, 255, 255, 255, 255)
 	end
-	local faces = {
-		{1, 2, 4}, {4, 3, 1},
-		{2, 1, 5}, {5, 6, 2},
-		{3, 4, 8}, {8, 7, 3},
-		{7, 8, 6}, {6, 5, 7},
-		{4, 2, 6}, {6, 8, 4},
-		{1, 3, 7}, {7, 5, 1}
-	}
-	for _, face in ipairs(faces) do
-		local p1, p2, p3 = corners[face[1]], corners[face[2]], corners[face[3]]
-		DrawPoly(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, r, g, b, 80)
+	if forDebug and r and g and b then
+		local faces = {
+			{1, 2, 4}, {4, 3, 1},
+			{2, 1, 5}, {5, 6, 2},
+			{3, 4, 8}, {8, 7, 3},
+			{7, 8, 6}, {6, 5, 7},
+			{4, 2, 6}, {6, 8, 4},
+			{1, 3, 7}, {7, 5, 1}
+		}
+		for _, face in ipairs(faces) do
+			local p1, p2, p3 = corners[face[1]], corners[face[2]], corners[face[3]]
+			DrawPoly(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, r, g, b, 80)
+		end
 	end
 end
 
-function CreatePropForCreator(hash, x, y, z, rotX, rotY, rotZ, color, prpsba)
+function CreatePropForCreator(hash, x, y, z, rotX, rotY, rotZ, color)
 	if IsModelInCdimage(hash) and IsModelValid(hash) then
 		RequestModel(hash)
 		while not HasModelLoaded(hash) do
@@ -162,70 +179,6 @@ function CreatePropForCreator(hash, x, y, z, rotX, rotY, rotZ, color, prpsba)
 		if obj ~= 0 then
 			SetEntityRotation(obj, rotX or 0.0, rotY or 0.0, rotZ or 0.0, 2, 0)
 			SetObjectTextureVariation(obj, color or 0)
-			if speedUpObjects[hash] then
-				local speed = 25
-				if prpsba == 1 then
-					speed = 15
-				elseif prpsba == 2 then
-					speed = 25
-				elseif prpsba == 3 then
-					speed = 35
-				elseif prpsba == 4 then
-					speed = 45
-				elseif prpsba == 5 then
-					speed = 100
-				end
-				local duration = 0.4
-				if prpsba == 1 then
-					duration = 0.3
-				elseif prpsba == 2 then
-					duration = 0.4
-				elseif prpsba == 3 then
-					duration = 0.5
-				elseif prpsba == 4 then
-					duration = 0.5
-				elseif prpsba == 5 then
-					duration = 0.5
-				end
-				SetObjectStuntPropSpeedup(obj, speed)
-				SetObjectStuntPropDuration(obj, duration)
-			end
-			if slowDownObjects[hash] then
-				local speed = 30
-				if prpsba == 1 then
-					speed = 44
-				elseif prpsba == 2 then
-					speed = 30
-				elseif prpsba == 3 then
-					speed = 16
-				end
-				SetObjectStuntPropSpeedup(obj, speed)
-			end
-			if hash == GetHashKey("stt_prop_hoop_small_01") then
-				RequestNamedPtfxAsset("core")
-				while not HasNamedPtfxAssetLoaded("core") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("core")
-				StartParticleFxLoopedOnEntity("ent_amb_fire_ring", obj, 0.0, 0.0, 4.5, 0.0, 0.0, 90.0, 3.5, false, false, false)
-			elseif hash == GetHashKey("ar_prop_ar_hoop_med_01") then
-				RequestNamedPtfxAsset("scr_stunts")
-				while not HasNamedPtfxAssetLoaded("scr_stunts") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("scr_stunts")
-				StartParticleFxLoopedOnEntity("scr_stunts_fire_ring", obj, 0.0, 0.0, 11.5, -2.0, 0.0, 0.0, 0.47, false, false, false)
-			elseif hash == GetHashKey("stt_prop_hoop_constraction_01a") then
-				RequestNamedPtfxAsset("scr_stunts")
-				while not HasNamedPtfxAssetLoaded("scr_stunts") do
-					Citizen.Wait(0)
-				end
-				UseParticleFxAssetNextCall("scr_stunts")
-				StartParticleFxLoopedOnEntity("scr_stunts_fire_ring", obj, 0.0, 0.0, 25.0, -12.5, 0.0, 0.0, 1.0, false, false, false)
-			end
-			SetEntityAlpha(obj, 150)
-			SetEntityLodDist(obj, 16960)
-			FreezeEntityPosition(obj, true)
 			return obj
 		else
 			return nil
@@ -235,7 +188,13 @@ function CreatePropForCreator(hash, x, y, z, rotX, rotY, rotZ, color, prpsba)
 end
 
 function CreateGridVehicleForCreator(hash, x, y, z, heading, combination)
-	local model, z_valid, vehicle = nil, 0.0, 0
+	local model, x_valid, y_valid, z_valid, vehicle = nil, x, y, 0.0, 0
+	if x_valid <= -16000.0 or x_valid >= 16000.0 then
+		x_valid = 0.0
+	end
+	if y_valid <= -16000.0 or y_valid >= 16000.0 then
+		y_valid = 0.0
+	end
 	if IsModelInCdimage(hash) and IsModelValid(hash) and IsModelAVehicle(hash) then
 		model = hash
 	else
@@ -244,14 +203,14 @@ function CreateGridVehicleForCreator(hash, x, y, z, heading, combination)
 	if (z > -198.99) and (z <= 2698.99) then
 		z_valid = z
 	else
-		local found, groundZ = GetGroundZFor_3dCoord(x, y, z, true)
+		local found, groundZ = GetGroundZFor_3dCoord(x_valid, y_valid, z, true)
 		z_valid = found and (groundZ > -198.99) and (groundZ <= 2698.99) and groundZ or 0.0
 	end
 	RequestModel(model)
 	while not HasModelLoaded(model) do
 		Citizen.Wait(0)
 	end
-	vehicle = CreateVehicle(model, x, y, z_valid, heading, false, false)
+	vehicle = CreateVehicle(model, x_valid, y_valid, z_valid, heading, false, false)
 	SetModelAsNoLongerNeeded(model)
 	SetEntityRotation(vehicle, 0.0, 0.0, heading, 2, 0)
 	FreezeEntityPosition(vehicle, true)
@@ -278,7 +237,7 @@ function CreateBlipForCreator(x, y, z, scale, id, color, entity)
 	return blip
 end
 
-function UpdateBlipForCreator(str)
+function UpdateBlipForCreator(str, data)
 	if str == "checkpoint" then
 		for k, v in pairs(blips.checkpoints) do
 			RemoveBlip(v)
@@ -299,8 +258,10 @@ function UpdateBlipForCreator(str)
 			RemoveBlip(v)
 		end
 		blips.objects = {}
-		for k, v in pairs(currentRace.objects) do
-			blips.objects[k] = CreateBlipForCreator(v.x, v.y, v.z, 0.60, 271, 50, v.handle)
+		if data then
+			for k, v in pairs(data) do
+				blips.objects[k] = CreateBlipForCreator(v.x, v.y, v.z, 0.60, 271, 50, v.handle)
+			end
 		end
 	end
 end
@@ -768,56 +729,28 @@ function CreateBlipForTest(cpIndex)
 	end
 end
 
-function TestCurrentCheckpoint(respawnData)
+function TestCurrentCheckpoint(respawnData, callback)
 	Citizen.CreateThread(function()
 		local ped = PlayerPedId()
-		local x, y, z, heading, hash = respawnData.x, respawnData.y, respawnData.z, respawnData.heading, respawnData.model
-		global_var.autoRespawn = true
-		global_var.enableBeastMode = false
+		local x, y, z = GetValidXYZFor_3dCoord(respawnData.x, respawnData.y, respawnData.z, false, true)
+		local heading = respawnData.heading
+		local hash = respawnData.model
 		local default_vehicle = currentRace.default_class and currentRace.available_vehicles[currentRace.default_class] and currentRace.available_vehicles[currentRace.default_class].index and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index] and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index].model or currentRace.test_vehicle
 		local model = ((hash and hash ~= 0) and (tonumber(hash) or GetHashKey(hash))) or (tonumber(default_vehicle) or GetHashKey(default_vehicle))
-		if model == -422877666 then
-			global_var.autoRespawn = false
-			if global_var.testVehicleHandle then
-				local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
-				DeleteEntity(global_var.testVehicleHandle)
-				TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
-				global_var.testVehicleHandle = nil
-			end
-			ClearPedBloodDamage(ped)
-			ClearPedWetness(ped)
-			GiveWeaponToPed(ped, "GADGET_PARACHUTE", 1, false, false)
-			SetEntityCoords(ped, x, y, GetValidZFor_3dCoord(x, y, z, false, true))
-			SetEntityHeading(ped, heading)
-			SetGameplayCamRelativeHeading(0)
-			SetRunSprintMultiplierForPlayer(PlayerId(), 1.0)
-			if global_var.tipsRendered then
-				global_var.respawnData.checkpointIndex_draw = global_var.respawnData.checkpointIndex + 1
-				ResetCheckpointAndBlipForTest()
-				CreateBlipForTest(global_var.respawnData.checkpointIndex_draw)
-				CreateCheckpointForTest(global_var.respawnData.checkpointIndex_draw, false)
-				CreateCheckpointForTest(global_var.respawnData.checkpointIndex_draw, true)
-			end
-			global_var.isRespawning = false
-			return
+		local parachute = (model == -422877666) and true or false
+		local beast = (model == -731262150) and true or false
+		global_var.autoRespawn = (not parachute and not beast) and true or false
+		global_var.enableBeastMode = beast and true or false
+		if not IsNearbyObjectsSpawned(x, y) or callback ~= nil then
+			if callback == nil then DoScreenFadeOut(0) end
+			objectPool.forceLoad.x = x
+			objectPool.forceLoad.y = y
+			objectPool.forceLoad.z = z
+			local time = GetGameTimer()
+			while not IsNearbyObjectsSpawned(x, y) and (GetGameTimer() - time < 500) do Citizen.Wait(0) end
 		end
-		if model == -731262150 then
-			global_var.autoRespawn = false
-			global_var.enableBeastMode = true
-			if global_var.testVehicleHandle then
-				local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
-				DeleteEntity(global_var.testVehicleHandle)
-				TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
-				global_var.testVehicleHandle = nil
-			end
-			ClearPedBloodDamage(ped)
-			ClearPedWetness(ped)
-			RemoveAllPedWeapons(ped, false)
-			SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
-			SetEntityCoords(ped, x, y, GetValidZFor_3dCoord(x, y, z, false, true))
-			SetEntityHeading(ped, heading)
-			SetGameplayCamRelativeHeading(0)
-			SetRunSprintMultiplierForPlayer(PlayerId(), 1.49)
+		if parachute or beast then
+			if callback ~= nil then callback(ped) end
 			if global_var.tipsRendered then
 				global_var.respawnData.checkpointIndex_draw = global_var.respawnData.checkpointIndex + 1
 				ResetCheckpointAndBlipForTest()
@@ -825,6 +758,28 @@ function TestCurrentCheckpoint(respawnData)
 				CreateCheckpointForTest(global_var.respawnData.checkpointIndex_draw, false)
 				CreateCheckpointForTest(global_var.respawnData.checkpointIndex_draw, true)
 			end
+			if global_var.testVehicleHandle then
+				local netId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
+				DeleteEntity(global_var.testVehicleHandle)
+				TriggerServerEvent("custom_creator:server:deleteVehicle", netId)
+				global_var.testVehicleHandle = nil
+			end
+			if parachute then
+				GiveWeaponToPed(ped, "GADGET_PARACHUTE", 1, false, false)
+			else
+				RemoveAllPedWeapons(ped, false)
+				SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
+			end
+			ClearPedBloodDamage(ped)
+			ClearPedWetness(ped)
+			SetEntityCoords(ped, x, y, z)
+			SetEntityHeading(ped, heading)
+			SetRunSprintMultiplierForPlayer(PlayerId(), beast and 1.49 or 1.0)
+			SetGameplayCamRelativeHeading(0)
+			DoScreenFadeIn(500)
+			objectPool.forceLoad.x = nil
+			objectPool.forceLoad.y = nil
+			objectPool.forceLoad.z = nil
 			global_var.isRespawning = false
 			return
 		end
@@ -840,9 +795,10 @@ function TestCurrentCheckpoint(respawnData)
 		end
 		-- Spawn vehicle at the top of the player, fix OneSync culling
 		local pos = GetEntityCoords(ped)
-		local newVehicle = CreateVehicle(model, pos.x, pos.y, GetValidZFor_3dCoord(pos.x, pos.y, pos.z, true, false), heading, true, false)
-		local vehNetId = NetworkGetNetworkIdFromEntity(newVehicle)
-		TriggerServerEvent("custom_creator:server:spawnVehicle", vehNetId)
+		local _x, _y, _z = GetValidXYZFor_3dCoord(pos.x, pos.y, pos.z, true, false)
+		local newVehicle = CreateVehicle(model, _x, _y, _z, heading, true, false)
+		local netId = NetworkGetNetworkIdFromEntity(newVehicle)
+		TriggerServerEvent("custom_creator:server:spawnVehicle", netId)
 		SetModelAsNoLongerNeeded(model)
 		FreezeEntityPosition(newVehicle, true)
 		SetEntityCollision(newVehicle, false, false)
@@ -860,6 +816,7 @@ function TestCurrentCheckpoint(respawnData)
 			end
 		end
 		Citizen.Wait(0) -- Do not delete! Vehicle still has collisions before this. BUG?
+		if callback ~= nil then callback(ped) end
 		if global_var.tipsRendered then
 			global_var.respawnData.checkpointIndex_draw = global_var.respawnData.checkpointIndex + 1
 			ResetCheckpointAndBlipForTest()
@@ -868,13 +825,13 @@ function TestCurrentCheckpoint(respawnData)
 			CreateCheckpointForTest(global_var.respawnData.checkpointIndex_draw, true)
 		end
 		if global_var.testVehicleHandle then
-			local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
+			local netId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
 			DeleteEntity(global_var.testVehicleHandle)
-			TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
+			TriggerServerEvent("custom_creator:server:deleteVehicle", netId)
 		end
 		ClearPedBloodDamage(ped)
 		ClearPedWetness(ped)
-		SetEntityCoords(newVehicle, x, y, GetValidZFor_3dCoord(x, y, z, false, true))
+		SetEntityCoords(newVehicle, x, y, z)
 		SetEntityHeading(newVehicle, heading)
 		SetPedIntoVehicle(ped, newVehicle, -1)
 		SetEntityCollision(newVehicle, true, true)
@@ -882,6 +839,7 @@ function TestCurrentCheckpoint(respawnData)
 		SetVehicleDirtLevel(newVehicle, 0.0)
 		SetVehicleEngineOn(newVehicle, true, true, false)
 		SetGameplayCamRelativeHeading(0)
+		DoScreenFadeIn(500)
 		Citizen.Wait(0) -- Do not delete! Respawn under fake water
 		FreezeEntityPosition(newVehicle, false)
 		ActivatePhysics(newVehicle)
@@ -894,6 +852,9 @@ function TestCurrentCheckpoint(respawnData)
 		if model == GetHashKey("avenger") or model == GetHashKey("hydra") then
 			SetVehicleFlightNozzlePositionImmediate(newVehicle, 0.0)
 		end
+		objectPool.forceLoad.x = nil
+		objectPool.forceLoad.y = nil
+		objectPool.forceLoad.z = nil
 		global_var.testVehicleHandle = newVehicle
 		global_var.isRespawning = false
 	end)
@@ -915,36 +876,26 @@ function TransformVehicle(checkpoint, speed, rotation, velocity)
 			copyVelocity = ((math.abs(velocity.x) > 0.0) or (math.abs(velocity.y) > 0.0) or (math.abs(velocity.z) > 0.0)) and true or false
 			speed = speed > 0.03 and speed or 30.0
 		end
-		global_var.autoRespawn = true
-		global_var.enableBeastMode = false
-		if model == -422877666 then
-			global_var.autoRespawn = false
+		local parachute = (model == -422877666) and true or false
+		local beast = (model == -731262150) and true or false
+		global_var.autoRespawn = (not parachute and not beast) and true or false
+		global_var.enableBeastMode = beast and true or false
+		if parachute or beast then
 			if global_var.testVehicleHandle then
-				local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
+				local netId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
 				DeleteEntity(global_var.testVehicleHandle)
-				TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
+				TriggerServerEvent("custom_creator:server:deleteVehicle", netId)
 				global_var.testVehicleHandle = nil
 			end
-			DisplayCustomMsgs(GetTranslate("Transform-Parachute"))
-			GiveWeaponToPed(ped, "GADGET_PARACHUTE", 1, false, false)
-			SetEntityVelocity(ped, velocity.x, velocity.y, velocity.z)
-			SetRunSprintMultiplierForPlayer(PlayerId(), 1.0)
-			global_var.isTransforming = false
-			return
-		elseif model == -731262150 then
-			global_var.autoRespawn = false
-			global_var.enableBeastMode = true
-			if global_var.testVehicleHandle then
-				local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
-				DeleteEntity(global_var.testVehicleHandle)
-				TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
-				global_var.testVehicleHandle = nil
+			DisplayCustomMsgs(parachute and GetTranslate("Transform-Parachute") or GetTranslate("Transform-Beast"))
+			if parachute then
+				GiveWeaponToPed(ped, "GADGET_PARACHUTE", 1, false, false)
+			else
+				RemoveAllPedWeapons(ped, false)
+				SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
 			end
-			DisplayCustomMsgs(GetTranslate("Transform-Beast"))
-			RemoveAllPedWeapons(ped, false)
-			SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
 			SetEntityVelocity(ped, velocity.x, velocity.y, velocity.z)
-			SetRunSprintMultiplierForPlayer(PlayerId(), 1.49)
+			SetRunSprintMultiplierForPlayer(PlayerId(), beast and 1.49 or 1.0)
 			global_var.isTransforming = false
 			return
 		end
@@ -964,14 +915,16 @@ function TransformVehicle(checkpoint, speed, rotation, velocity)
 		end
 		local pos = GetEntityCoords(ped)
 		local heading = GetEntityHeading(ped)
-		local newVehicle = CreateVehicle(model, pos.x, pos.y, GetValidZFor_3dCoord(pos.x, pos.y, pos.z, true, false), heading, true, false)
-		local vehNetId = NetworkGetNetworkIdFromEntity(newVehicle)
-		TriggerServerEvent("custom_creator:server:spawnVehicle", vehNetId)
+		local x1, y1, z1 = GetValidXYZFor_3dCoord(pos.x, pos.y, pos.z, true, false)
+		local x2, y2, z2 = GetValidXYZFor_3dCoord(pos.x, pos.y, pos.z, false, true)
+		local newVehicle = CreateVehicle(model, x1, y1, z1, heading, true, false)
+		local netId = NetworkGetNetworkIdFromEntity(newVehicle)
+		TriggerServerEvent("custom_creator:server:spawnVehicle", netId)
 		SetModelAsNoLongerNeeded(model)
 		if global_var.testVehicleHandle then
-			local vehId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
+			local netId = NetworkGetNetworkIdFromEntity(global_var.testVehicleHandle)
 			DeleteEntity(global_var.testVehicleHandle)
-			TriggerServerEvent("custom_creator:server:deleteVehicle", vehId)
+			TriggerServerEvent("custom_creator:server:deleteVehicle", netId)
 		end
 		SetVehRadioStation(newVehicle, "OFF")
 		SetVehicleDoorsLocked(newVehicle, 10)
@@ -983,7 +936,7 @@ function TransformVehicle(checkpoint, speed, rotation, velocity)
 			end
 		end
 		SetPedIntoVehicle(ped, newVehicle, -1)
-		SetEntityCoords(newVehicle, pos.x, pos.y, GetValidZFor_3dCoord(pos.x, pos.y, pos.z, false, true))
+		SetEntityCoords(newVehicle, x2, y2, z2)
 		SetEntityHeading(newVehicle, heading)
 		SetVehicleFuelLevel(newVehicle, 100.0)
 		SetVehicleDirtLevel(newVehicle, 0.0)
@@ -1218,7 +1171,8 @@ end
 function WarpVehicle(checkpoint, entity)
 	local entitySpeed = GetEntitySpeed(entity)
 	local entityRotation = GetEntityRotation(entity, 2)
-	SetEntityCoords(entity, checkpoint.x, checkpoint.y, GetValidZFor_3dCoord(checkpoint.x, checkpoint.y, checkpoint.z, false, true))
+	local x, y, z = GetValidXYZFor_3dCoord(checkpoint.x, checkpoint.y, checkpoint.z, false, true)
+	SetEntityCoords(entity, x, y, z)
 	SetEntityRotation(entity, entityRotation, 2)
 	SetEntityHeading(entity, checkpoint.heading)
 	SetVehicleForwardSpeed(entity, entitySpeed)
@@ -1452,6 +1406,48 @@ function DisplayCustomMsgs(msg)
 	end)
 end
 
+function DisplayBusyspinner(status, len)
+	if status ~= "" and len > 0 and (global_var.lock or lockSession) then
+		Citizen.CreateThread(function()
+			local loadCount = 0.0
+			local lastCount = nil
+			local breakCount = 0
+			global_var.status = status
+			while global_var.status == status do
+				local displayCount = math.floor(loadCount * 65536 * 100 / len)
+				if not lastCount or lastCount ~= displayCount then
+					lastCount = displayCount
+					local text = displayCount .. "%"
+					if status == "load" then
+						text = string.format(GetTranslate("load-progress"), displayCount)
+					elseif status == "download" then
+						text = string.format(GetTranslate("download-progress"), displayCount)
+					elseif status == "upload" then
+						text = string.format(GetTranslate("upload-progress"), displayCount)
+					elseif status == "sync" then
+						text = string.format(GetTranslate("sync-progress"), displayCount)
+					end
+					RemoveLoadingPrompt()
+					BeginTextCommandBusyString("STRING")
+					AddTextComponentSubstringPlayerName(text)
+					EndTextCommandBusyString(4)
+				end
+				if (loadCount + 0.1) * 65536 <= len then
+					loadCount = loadCount + 0.1
+				else
+					breakCount = breakCount + 1
+					if breakCount >= 20 then
+						RemoveLoadingPrompt()
+						global_var.status = ""
+						break
+					end
+				end
+				Citizen.Wait(100)
+			end
+		end)
+	end
+end
+
 function CrossVec(vecA, vecB)
 	return vector3(
 		(vecA.y * vecB.z) - (vecA.z * vecB.y),
@@ -1533,8 +1529,22 @@ function TrimedValue(value)
 	end
 end
 
-function GetValidZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
+function GetValidXYZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
+	local x_valid = posX
+	local y_valid = posY
 	local z_valid = 0.0
+	if x_valid <= -16000.0 or x_valid >= 16000.0 then
+		x_valid = 0.0
+		if not forCreate and printLog then
+			print("Failed to set player coords at the specified x. Please ensure the x is between -16000 and 16000")
+		end
+	end
+	if y_valid <= -16000.0 or y_valid >= 16000.0 then
+		y_valid = 0.0
+		if not forCreate and printLog then
+			print("Failed to set player coords at the specified y. Please ensure the y is between -16000 and 16000")
+		end
+	end
 	if forCreate and (posZ + 50.0 > -198.99) and (posZ + 50.0 <= 2698.99) then
 		z_valid = posZ + 50.0
 	elseif forCreate and (posZ - 50.0 > -198.99) and (posZ - 50.0 <= 2698.99) then
@@ -1542,13 +1552,13 @@ function GetValidZFor_3dCoord(posX, posY, posZ, forCreate, printLog)
 	elseif not forCreate and (posZ > -198.99) and (posZ <= 2698.99) then
 		z_valid = posZ
 	else
-		local found, groundZ = GetGroundZFor_3dCoord(posX, posY, posZ, true)
+		local found, groundZ = GetGroundZFor_3dCoord(x_valid, y_valid, posZ, true)
 		z_valid = found and (groundZ > -198.99) and (groundZ <= 2698.99) and groundZ or 0.0
 		if not forCreate and printLog then
-			print("Failed to set player coords at the specified height. Please ensure the height is between -199 and 2699")
+			print("Failed to set player coords at the specified z. Please ensure the z is between -199 and 2699")
 		end
 	end
-	return z_valid
+	return x_valid, y_valid, z_valid
 end
 
 function ResetGlobalVariable(str)

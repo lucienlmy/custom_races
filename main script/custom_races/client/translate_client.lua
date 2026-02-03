@@ -2647,6 +2647,36 @@ local translation = {
 		["jp"] = "他のプレイヤーを待っています",
 		["mx"] = "Esperando a otros jugadores",
 		["cn"] = "等待其他玩家中"
+	},
+	["download-progress"] = {
+		["en"] = "Downloading (%s%%)",
+		["fr"] = "Téléchargement (%s%%)",
+		["de"] = "Herunterladen (%s%%)",
+		["it"] = "Download (%s%%)",
+		["es"] = "Descargando (%s%%)",
+		["br"] = "Baixando (%s%%)",
+		["pl"] = "Pobieranie (%s%%)",
+		["ru"] = "Загрузка (%s%%)",
+		["ko"] = "다운로드 중 (%s%%)",
+		["zh"] = "下載中 (%s%%)",
+		["jp"] = "ダウンロード中 (%s%%)",
+		["mx"] = "Descargando (%s%%)",
+		["cn"] = "下载中 (%s%%)"
+	},
+	["load-progress"] = {
+		["en"] = "Loading track list (%s%%)",
+		["fr"] = "Chargement liste pistes (%s%%)",
+		["de"] = "Lade streckenliste (%s%%)",
+		["it"] = "Caricamento lista tracce (%s%%)",
+		["es"] = "Cargando lista pistas (%s%%)",
+		["br"] = "Carregando lista pistas (%s%%)",
+		["pl"] = "Ładowanie listy tras (%s%%)",
+		["ru"] = "Загрузка списка треков (%s%%)",
+		["ko"] = "트랙 목록 로딩 중 (%s%%)",
+		["zh"] = "加載賽道列表中 (%s%%)",
+		["jp"] = "トラック一覧読み込み中 (%s%%)",
+		["mx"] = "Cargando lista pistas (%s%%)",
+		["cn"] = "加载赛道列表中 (%s%%)"
 	}
 }
 

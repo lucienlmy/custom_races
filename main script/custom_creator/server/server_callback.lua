@@ -11,7 +11,7 @@ RegisterNetEvent("custom_creator:server:callback", function(eventName, requestId
 	local playerName = GetPlayerName(playerId)
 	if not serverCallbacks[eventName] or not playerName then return end
 	serverCallbacks[eventName]({src = playerId, name = playerName}, function(...)
-		TriggerClientEvent("custom_creator:client:callback", playerId, requestId, ...)
+		TriggerLatentClientEvent("custom_creator:client:callback", playerId, 65536, requestId, ...)
 	end, ...)
 end)
 
