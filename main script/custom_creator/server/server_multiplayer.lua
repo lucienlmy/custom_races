@@ -205,17 +205,21 @@ RegisterNetEvent("custom_creator:server:leaveSession", function(raceid)
 	local currentSession = CreatorServer.Sessions[raceid]
 	if currentSession then
 		local playerName = GetPlayerName(playerId)
+		local found = false
 		for k, v in pairs(currentSession.creators) do
 			if v.playerId == playerId then
+				found = true
 				table.remove(currentSession.creators, k)
 				break
 			end
 		end
-		if #currentSession.creators == 0 or not currentSession.data then
-			CreatorServer.Sessions[raceid] = nil
-		else
-			for k, v in pairs(currentSession.creators) do
-				TriggerClientEvent("custom_creator:client:playerLeaveSession", v.playerId, playerName, playerId)
+		if found then
+			if #currentSession.creators == 0 then
+				CreatorServer.Sessions[currentSession.sessionId] = nil
+			else
+				for k, v in pairs(currentSession.creators) do
+					TriggerClientEvent("custom_creator:client:playerLeaveSession", v.playerId, playerName, playerId)
+				end
 			end
 		end
 	end
@@ -225,8 +229,10 @@ CreateServerCallback("custom_creator:server:sessionData", function(player, callb
 	local currentSession = CreatorServer.Sessions[raceid]
 	if currentSession then
 		currentSession.data = data
-		callback({})
+	else
+		print("Error: The session no longer exists when receiving session data? Report it on GitHub to help me fix it!")
 	end
+	callback({})
 end)
 
 CreateServerCallback("custom_creator:server:joinPlayerSession", function(player, callback, sessionId)

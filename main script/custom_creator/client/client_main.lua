@@ -931,10 +931,10 @@ function OpenCreator()
 					CreateCreatorFreeCam(ped)
 					SetEntityCoordsNoOffset(ped, pos.x + 1000.0, pos.y + 1000.0, pos.z)
 					ClearAreaLeaveVehicleHealth(cameraPosition.x + 0.0, cameraPosition.y + 0.0, cameraPosition.z + 0.0, 100000000000000000000000.0, false, false, false, false, false)
-					for uniqueId, data in pairs(objectPool.activeEffects) do
-						if data.ptfxHandle then
-							StopParticleFxLooped(data.ptfxHandle, true)
-							data.ptfxHandle = nil
+					for uniqueId, effectData in pairs(objectPool.activeEffects) do
+						if effectData.ptfxHandle then
+							StopParticleFxLooped(effectData.ptfxHandle, true)
+							effectData.ptfxHandle = nil
 						end
 						objectPool.activeEffects[uniqueId] = nil
 					end
@@ -972,6 +972,19 @@ function OpenCreator()
 
 			if RageUI.Visible(MainMenu) then
 				buttonToDraw = -1
+				if currentRace.title ~= "" then
+					if nuiCallBack == "import ugc" then
+						SendNUIMessage({
+							action = "off"
+						})
+						SetNuiFocus(false, false)
+						nuiCallBack = ""
+					end
+					if global_var.querying then
+						global_var.querying = false
+						TriggerServerEvent("custom_creator:server:cancel")
+					end
+				end
 			end
 
 			if RageUI.Visible(RaceDetailSubMenu) then

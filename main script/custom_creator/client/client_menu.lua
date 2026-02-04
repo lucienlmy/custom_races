@@ -59,6 +59,7 @@ function RageUI.PoolMenus:Creator()
 			if global_var.querying then
 				Items:AddButton(GetTranslate("MainMenu-Button-Cancel"), nil, { IsDisabled = false }, function(onSelected)
 					if (onSelected) then
+						global_var.querying = false
 						TriggerServerEvent("custom_creator:server:cancel")
 					end
 				end)
@@ -441,6 +442,8 @@ function RageUI.PoolMenus:Creator()
 									end, currentRace.raceid, currentRace)
 									DisplayBusyspinner("sync", #json.encode(currentRace) * 1.02)
 								else
+									RemoveLoadingPrompt()
+									global_var.status = ""
 									global_var.lock = false
 								end
 							end, ConvertDataToUGC(), "save")
@@ -482,6 +485,8 @@ function RageUI.PoolMenus:Creator()
 									end, currentRace.raceid, currentRace)
 									DisplayBusyspinner("sync", #json.encode(currentRace) * 1.02)
 								else
+									RemoveLoadingPrompt()
+									global_var.status = ""
 									global_var.lock = false
 								end
 							end, ConvertDataToUGC(), "publish")
@@ -1053,33 +1058,53 @@ function RageUI.PoolMenus:Creator()
 	end
 
 	PlacementSubMenu:IsVisible(function(Items)
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-StartingGrid"), (#currentRace.startingGrid == 0) and GetTranslate("PlacementSubMenu-Button-StartingGrid-Desc"), { IsDisabled = false, RightLabel = "→→→", Color = (#currentRace.startingGrid == 0) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-StartingGrid"), (#currentRace.startingGrid == 0) and GetTranslate("PlacementSubMenu-Button-StartingGrid-Desc"), { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→", Color = (#currentRace.startingGrid == 0) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
 
 		end, PlacementSubMenu_StartingGrid)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Checkpoints"), (#currentRace.checkpoints < 10) and GetTranslate("PlacementSubMenu-Button-Checkpoints-Desc"), { IsDisabled = false, RightLabel = "→→→", Color = (#currentRace.checkpoints < 10) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Checkpoints"), (#currentRace.checkpoints < 10) and GetTranslate("PlacementSubMenu-Button-Checkpoints-Desc"), { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→", Color = (#currentRace.checkpoints < 10) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
 
 		end, PlacementSubMenu_Checkpoints)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Props"), (#currentRace.objects == 0) and GetTranslate("PlacementSubMenu-Button-Props-Desc"), { IsDisabled = false, RightLabel = "→→→", Color = (#currentRace.objects == 0) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Props"), (#currentRace.objects == 0) and GetTranslate("PlacementSubMenu-Button-Props-Desc"), { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→", Color = (#currentRace.objects == 0) and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
 
 		end, PlacementSubMenu_Props)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Templates"), nil, { IsDisabled = false, RightLabel = "→→→" }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Templates"), nil, { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 		end, PlacementSubMenu_Templates)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-MoveAll"), nil, { IsDisabled = false, RightLabel = "→→→" }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-MoveAll"), nil, { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 		end, PlacementSubMenu_MoveAll)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-FixtureRemover"), nil, { IsDisabled = false, RightLabel = "→→→" }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-FixtureRemover"), nil, { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 		end, PlacementSubMenu_FixtureRemover)
 
-		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Firework"), nil, { IsDisabled = false, RightLabel = "→→→" }, function(onSelected)
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Firework"), nil, { IsDisabled = global_var.IsNuiFocused or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 		end, PlacementSubMenu_Firework)
+
+		Items:AddButton(GetTranslate("PlacementSubMenu-Button-Import"), not inSession and GetTranslate("PlacementSubMenu-Button-Desc"), { IsDisabled = not inSession or global_var.IsNuiFocused or global_var.lock or lockSession, Color = not inSession and { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} } }, function(onSelected)
+			if (onSelected) then
+				SetNuiFocus(true, true)
+				SendNUIMessage({
+					action = "open",
+					value = GetTranslate("paste-url")
+				})
+				nuiCallBack = "import ugc"
+			end
+		end)
+
+		if global_var.querying then
+			Items:AddButton(GetTranslate("PlacementSubMenu-Button-Cancel"), nil, { IsDisabled = false }, function(onSelected)
+				if (onSelected) then
+					global_var.querying = false
+					TriggerServerEvent("custom_creator:server:cancel")
+				end
+			end)
+		end
 	end, function(Panels)
 	end)
 
@@ -1439,10 +1464,10 @@ function RageUI.PoolMenus:Creator()
 						fireworkProps[#fireworkProps + 1] = v
 					end
 				end
-				for uniqueId, data in pairs(objectPool.activeEffects) do
-					if data.ptfxHandle then
-						StopParticleFxLooped(data.ptfxHandle, true)
-						data.ptfxHandle = nil
+				for uniqueId, effectData in pairs(objectPool.activeEffects) do
+					if effectData.ptfxHandle then
+						StopParticleFxLooped(effectData.ptfxHandle, true)
+						effectData.ptfxHandle = nil
 					end
 					objectPool.activeEffects[uniqueId] = nil
 				end
@@ -3746,7 +3771,7 @@ function RageUI.PoolMenus:Creator()
 		end
 
 		Items:AddButton(GetTranslate("PlacementSubMenu_Props-Button-Delete"), nil, { IsDisabled = global_var.IsNuiFocused or (not isPropPickedUp) or lockSession, Color = { BackgroundColor = {255, 50, 50, 125}, HightLightColor = {255, 50, 50, 255} }, Emoji = "⚠️" }, function(onSelected)
-			if (onSelected) then
+			if (onSelected) and currentObject.uniqueId then
 				if inSession then
 					TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-delete")
 				end
@@ -3757,20 +3782,40 @@ function RageUI.PoolMenus:Creator()
 				end
 				for k, v in pairs(currentRace.objects) do
 					if v.uniqueId == currentObject.uniqueId then
-						objectPool.all[v.uniqueId] = nil
-						objectPool.effects[v.uniqueId] = nil
-						local gx = math.floor(v.x / 100.0)
-						local gy = math.floor(v.y / 100.0)
-						if objectPool.grids[gx] and objectPool.grids[gx][gy] then
-							for i, object in pairs(objectPool.grids[gx][gy]) do
-								if v.uniqueId == object.uniqueId then
-									table.remove(objectPool.grids[gx][gy], i)
-									break
-								end
-							end
-						end
 						table.remove(currentRace.objects, k)
 						break
+					end
+				end
+				objectPool.all[currentObject.uniqueId] = nil
+				objectPool.effects[currentObject.uniqueId] = nil
+				for uniqueId, effectData in pairs(objectPool.activeEffects) do
+					if uniqueId == currentObject.uniqueId then
+						if effectData.ptfxHandle then
+							StopParticleFxLooped(effectData.ptfxHandle, true)
+							effectData.ptfxHandle = nil
+						end
+						objectPool.activeEffects[uniqueId] = nil
+						break
+					end
+				end
+				for uniqueId, object in pairs(objectPool.activeObjects) do
+					if uniqueId == currentObject.uniqueId then
+						if object.handle then
+							DeleteObject(object.handle)
+							object.handle = nil
+						end
+						objectPool.activeObjects[uniqueId] = nil
+						break
+					end
+				end
+				local gx = math.floor(currentObject.x / 100.0)
+				local gy = math.floor(currentObject.y / 100.0)
+				if objectPool.grids[gx] and objectPool.grids[gx][gy] then
+					for i, object in pairs(objectPool.grids[gx][gy]) do
+						if object.uniqueId == currentObject.uniqueId then
+							table.remove(objectPool.grids[gx][gy], i)
+							break
+						end
 					end
 				end
 				if objectIndex > #currentRace.objects then

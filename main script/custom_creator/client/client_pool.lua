@@ -1,3 +1,5 @@
+local currentTime = 0
+local lastRefreshTime = 0
 local isObjectSpawningInProgress = false
 local maxFilter = 1024
 local maxScanRadius = 50 -- 50 * 100 meters
@@ -75,6 +77,20 @@ function SpawnNearbyObjects()
 					objectPool.effectsFilter = {}
 					objectPool.effectsFilterKeep = {}
 					objectPool.activeGrids = {}
+					currentTime = GetGameTimer()
+					if currentTime - lastRefreshTime >= 60000 then
+						lastRefreshTime = currentTime
+						objectPool.all = {}
+						objectPool.grids = {}
+						for _, object in pairs(currentRace.objects) do
+							local gx = math.floor(object.x / 100.0)
+							local gy = math.floor(object.y / 100.0)
+							objectPool.grids[gx] = objectPool.grids[gx] or {}
+							objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+							objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+							objectPool.all[object.uniqueId] = gx .. "-" .. gy
+						end
+					end
 					if isPropPickedUp and currentObject.uniqueId then
 						if objectPool.all[currentObject.uniqueId] then
 							objectPool.filter[#objectPool.filter + 1] = {
@@ -120,21 +136,21 @@ function SpawnNearbyObjects()
 						end
 					end
 					for i = 1, maxEffects do
-						local data = objectPool.effectsFilter[i] or {}
-						local object = data.object or {}
+						local effectData = objectPool.effectsFilter[i] or {}
+						local object = effectData.object or {}
 						local uniqueId = object.uniqueId
 						if uniqueId and objectPool.effects[uniqueId] then
 							objectPool.effectsFilterKeep[uniqueId] = true
-							objectPool.activeEffects[uniqueId] = data
+							objectPool.activeEffects[uniqueId] = effectData
 						end
 					end
 					local effectsCount = TableCount(objectPool.activeEffects)
 					if effectsCount > maxEffects then
-						for uniqueId, data in pairs(objectPool.activeEffects) do
+						for uniqueId, effectData in pairs(objectPool.activeEffects) do
 							if not objectPool.effectsFilterKeep[uniqueId] then
-								if data.ptfxHandle then
-									StopParticleFxLooped(data.ptfxHandle, true)
-									data.ptfxHandle = nil
+								if effectData.ptfxHandle then
+									StopParticleFxLooped(effectData.ptfxHandle, true)
+									effectData.ptfxHandle = nil
 								end
 								objectPool.activeEffects[uniqueId] = nil
 								effectsCount = effectsCount - 1
@@ -161,10 +177,10 @@ function SpawnNearbyObjects()
 						local hash, x, y, z, rotX, rotY, rotZ, color, prpsba, visible, collision, dynamic = object.hash, object.x, object.y, object.z, object.rotX, object.rotY, object.rotZ, object.color, object.prpsba, object.visible, object.collision, object.dynamic
 						if not object.handle or objectPool.changedObjects[uniqueId] then
 							if object.handle then
-								local data = objectPool.activeEffects[uniqueId]
-								if data and data.ptfxHandle then
-									StopParticleFxLooped(data.ptfxHandle, true)
-									data.ptfxHandle = nil
+								local effectData = objectPool.activeEffects[uniqueId]
+								if effectData and effectData.ptfxHandle then
+									StopParticleFxLooped(effectData.ptfxHandle, true)
+									effectData.ptfxHandle = nil
 								end
 								DeleteObject(object.handle)
 								object.handle = nil
@@ -208,19 +224,19 @@ function SpawnNearbyObjects()
 						end
 						objectPool.activeGrids[objectPool.all[uniqueId] or "error"] = true
 					end
-					for uniqueId, data in pairs(objectPool.activeEffects) do
-						if not data.ptfxHandle then
-							StartEffectForObject(uniqueId, data.object, data.style)
+					for uniqueId, effectData in pairs(objectPool.activeEffects) do
+						if not effectData.ptfxHandle then
+							StartEffectForObject(uniqueId, effectData.object, effectData.style)
 						end
 					end
 					UpdateBlipForCreator("object", not inTestMode and objectPool.activeObjects or nil)
 				end
 				Citizen.Wait(sleep)
 			end
-			for uniqueId, data in pairs(objectPool.activeEffects) do
-				if data.ptfxHandle then
-					StopParticleFxLooped(data.ptfxHandle, true)
-					data.ptfxHandle = nil
+			for uniqueId, effectData in pairs(objectPool.activeEffects) do
+				if effectData.ptfxHandle then
+					StopParticleFxLooped(effectData.ptfxHandle, true)
+					effectData.ptfxHandle = nil
 				end
 			end
 			for uniqueId, object in pairs(objectPool.activeObjects) do
@@ -246,6 +262,8 @@ function SpawnNearbyObjects()
 			objectPool.activeObjects = {}
 			objectPool.activeEffects = {}
 			objectPool.changedObjects = {}
+			currentTime = 0
+			lastRefreshTime = 0
 			isObjectSpawningInProgress = false
 		end)
 	end
@@ -259,8 +277,8 @@ function StartEffectForObject(uniqueId, object, style)
 		while not HasNamedPtfxAssetLoaded(fxName) do Citizen.Wait(0) end
 		local handle = object and object.handle
 		if handle and DoesEntityExist(handle) and objectPool.effects[uniqueId] then
-			local data = objectPool.activeEffects[uniqueId]
-			if data and not data.ptfxHandle then
+			local effectData = objectPool.activeEffects[uniqueId]
+			if effectData and not effectData.ptfxHandle then
 				UseParticleFxAssetNextCall(fxName)
 				if style == 1 then
 					ptfxHandle = StartParticleFxLoopedOnEntity("ent_amb_fire_ring", handle, 0.0, 0.0, 4.5, 0.0, 0.0, 90.0, 3.5, false, false, false)
@@ -270,7 +288,7 @@ function StartEffectForObject(uniqueId, object, style)
 					ptfxHandle = StartParticleFxLoopedOnEntity("scr_stunts_fire_ring", handle, 0.0, 0.0, 25.0, -12.5, 0.0, 0.0, 1.0, false, false, false)
 				end
 				if ptfxHandle and ptfxHandle ~= 0 then
-					data.ptfxHandle = ptfxHandle
+					effectData.ptfxHandle = ptfxHandle
 				end
 			end
 		end

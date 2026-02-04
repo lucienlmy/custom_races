@@ -84,13 +84,17 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 			local ugc_json = string.find(url, "json$")
 			TriggerServerCallback("custom_creator:server:getUGC", function(data, permission)
 				if data and permission then
-					ConvertDataFromUGC(data)
-					global_var.thumbnailValid = false
-					SendNUIMessage({
-						action = "thumbnail_url",
-						thumbnail_url = currentRace.thumbnail
-					})
-					RageUI.QuitIndex = nil
+					if currentRace.title == "" then
+						ConvertDataFromUGC(data)
+						global_var.thumbnailValid = false
+						SendNUIMessage({
+							action = "thumbnail_url",
+							thumbnail_url = currentRace.thumbnail
+						})
+						RageUI.QuitIndex = nil
+					else
+						AddDataFromUGC(data)
+					end
 					DisplayCustomMsgs(GetTranslate("load-success"))
 				elseif not permission then
 					DisplayCustomMsgs(GetTranslate("no-permission"))

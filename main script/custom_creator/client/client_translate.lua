@@ -1166,6 +1166,51 @@ local translation = {
 		["mx"] = "Fuegos Artificiales",
 		["cn"] = "烟花"
 	},
+	["PlacementSubMenu-Button-Import"] = {
+		["en"] = "Import From Rockstar UGC",
+		["fr"] = "Importer Depuis Rockstar UGC",
+		["de"] = "Aus Rockstar UGC Importieren",
+		["it"] = "Importa Da Rockstar UGC",
+		["es"] = "Importar Desde Rockstar UGC",
+		["br"] = "Importar Do Rockstar UGC",
+		["pl"] = "Importuj Z Rockstar UGC",
+		["ru"] = "Импорт Из Rockstar UGC",
+		["ko"] = "Rockstar UGC에서 가져오기",
+		["zh"] = "從Rockstar UGC匯入",
+		["jp"] = "Rockstar UGC からインポート",
+		["mx"] = "Importar Desde Rockstar UGC",
+		["cn"] = "从Rockstar UGC导入"
+	},
+	["PlacementSubMenu-Button-Desc"] = {
+		["en"] = "Please save the map first",
+		["fr"] = "Veuillez d'abord enregistrer la carte",
+		["de"] = "Bitte speichern Sie zuerst die Karte",
+		["it"] = "Per favore salva prima la mappa",
+		["es"] = "Por favor guarda el mapa primero",
+		["br"] = "Por favor, salve o mapa primeiro",
+		["pl"] = "Proszę najpierw zapisać mapę",
+		["ru"] = "Пожалуйста, сначала сохраните карту",
+		["ko"] = "먼저 지도를 저장하세요",
+		["zh"] = "請先保存地圖",
+		["jp"] = "まずマップを保存してください",
+		["mx"] = "Por favor guarda el mapa primero",
+		["cn"] = "请先保存地图"
+	},
+	["PlacementSubMenu-Button-Cancel"] = {
+		["en"] = "Cancel Querying",
+		["fr"] = "Annuler La Requête",
+		["de"] = "Abfrage Abbrechen",
+		["it"] = "Annulla Interrogazione",
+		["es"] = "Cancelar Consulta",
+		["br"] = "Cancelar Consulta",
+		["pl"] = "Anuluj Zapytanie",
+		["ru"] = "Отменить Запрос",
+		["ko"] = "쿼리 취소",
+		["zh"] = "取消查詢",
+		["jp"] = "クエリをキャンセル",
+		["mx"] = "Cancelar Consulta",
+		["cn"] = "取消查询"
+	},
 
 	-- PlacementSubMenu_StartingGrid
 	["PlacementSubMenu_StartingGrid-Subtitle"] = {

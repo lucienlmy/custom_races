@@ -85,10 +85,10 @@ AddEventHandler("playerDropped", function()
 				break
 			end
 		end
-		if #currentSession.creators == 0 or not currentSession.data then
-			CreatorServer.Sessions[currentSession.sessionId] = nil
-		else
-			if found then
+		if found then
+			if #currentSession.creators == 0 then
+				CreatorServer.Sessions[currentSession.sessionId] = nil
+			else
 				for k, v in pairs(currentSession.creators) do
 					TriggerClientEvent("custom_creator:client:playerLeaveSession", v.playerId, playerName, playerId)
 				end

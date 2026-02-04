@@ -1436,7 +1436,7 @@ function DisplayBusyspinner(status, len)
 					loadCount = loadCount + 0.1
 				else
 					breakCount = breakCount + 1
-					if breakCount >= 20 then
+					if breakCount >= 20 and not (global_var.lock or lockSession) then
 						RemoveLoadingPrompt()
 						global_var.status = ""
 						break

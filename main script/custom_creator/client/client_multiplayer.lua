@@ -678,26 +678,46 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 			end
 		end
 	elseif str == "objects-delete" then
-		if (type(data) ~= "table") then return end
+		if (type(data) ~= "table") or not data.uniqueId then return end
 		for k, v in pairs(currentRace.objects) do
 			if v.uniqueId == data.uniqueId then
 				if playerName then
 					DisplayCustomMsgs(string.format(GetTranslate("objects-delete"), playerName, k, v.hash, v.x, v.y, v.z))
 				end
-				objectPool.all[v.uniqueId] = nil
-				objectPool.effects[v.uniqueId] = nil
-				local gx = math.floor(v.x / 100.0)
-				local gy = math.floor(v.y / 100.0)
-				if objectPool.grids[gx] and objectPool.grids[gx][gy] then
-					for i, object in pairs(objectPool.grids[gx][gy]) do
-						if v.uniqueId == object.uniqueId then
-							table.remove(objectPool.grids[gx][gy], i)
-							break
-						end
-					end
-				end
 				table.remove(currentRace.objects, k)
 				break
+			end
+		end
+		objectPool.all[data.uniqueId] = nil
+		objectPool.effects[data.uniqueId] = nil
+		for uniqueId, effectData in pairs(objectPool.activeEffects) do
+			if uniqueId == data.uniqueId then
+				if effectData.ptfxHandle then
+					StopParticleFxLooped(effectData.ptfxHandle, true)
+					effectData.ptfxHandle = nil
+				end
+				objectPool.activeEffects[uniqueId] = nil
+				break
+			end
+		end
+		for uniqueId, object in pairs(objectPool.activeObjects) do
+			if uniqueId == data.uniqueId then
+				if object.handle then
+					DeleteObject(object.handle)
+					object.handle = nil
+				end
+				objectPool.activeObjects[uniqueId] = nil
+				break
+			end
+		end
+		local gx = math.floor(data.x / 100.0)
+		local gy = math.floor(data.y / 100.0)
+		if objectPool.grids[gx] and objectPool.grids[gx][gy] then
+			for i, object in pairs(objectPool.grids[gx][gy]) do
+				if object.uniqueId == data.uniqueId then
+					table.remove(objectPool.grids[gx][gy], i)
+					break
+				end
 			end
 		end
 		if isPropPickedUp then
@@ -731,6 +751,9 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 			end
 			currentRace.objects[#currentRace.objects + 1] = object
+		end
+		if objectIndex == 0 and #currentRace.objects > 0 then
+			objectIndex = #currentRace.objects
 		end
 		if playerName then
 			DisplayCustomMsgs(string.format(GetTranslate("template-place"), playerName, #data))
