@@ -2319,7 +2319,7 @@ function RemoveFixtures()
 				hide[v.hash] = true
 			end
 			while status ~= "freemode" do
-				if status == "racing" or status == "spectating" then
+				if status == "ready" or status == "racing" or status == "spectating" then
 					local spawn = {}
 					for uniqueId, object in pairs(objectPool.activeObjects) do
 						if object.handle then
