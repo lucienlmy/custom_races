@@ -127,7 +127,7 @@ CreateServerCallback("custom_races:server:permission", function(player, callback
 		end
 		while isChecking or RaceServer.Data.IsUpdatingData do Citizen.Wait(0) end
 		if permission then
-			TriggerClientEvent("custom_races:client:info", playerId, #json.encode(RaceServer.Data.Front) * 1.02)
+			TriggerClientEvent("custom_races:client:info", playerId, "track-list", #json.encode(RaceServer.Data.Front) * 1.02)
 			callback(true, clientOutdated and RaceServer.Data.Front or nil, nil)
 		else
 			local cooldownTime = RaceServer.CooldownLicenses[identifier]
@@ -137,7 +137,7 @@ CreateServerCallback("custom_races:server:permission", function(player, callback
 					Citizen.Wait(1000 * 60 * 10)
 					RaceServer.CooldownLicenses[identifier] = nil
 				end)
-				TriggerClientEvent("custom_races:client:info", playerId, #json.encode(RaceServer.Data.Front) * 1.02)
+				TriggerClientEvent("custom_races:client:info", playerId, "track-list", #json.encode(RaceServer.Data.Front) * 1.02)
 				callback(true, clientOutdated and RaceServer.Data.Front or nil, nil)
 			else
 				callback(false, nil, math.floor((1000 * 60 * 10 - (GetGameTimer() - cooldownTime)) / 1000))
@@ -227,14 +227,21 @@ RegisterNetEvent("custom_races:server:createRace", function(data)
 						currentRoom.status = "racing"
 					end
 				elseif currentRoom.status == "racing" or currentRoom.status == "dnf" then
+					local allStarted = true
+					for k, v in pairs(currentRoom.players) do
+						if not v.raceStarted then
+							allStarted = false
+							break
+						end
+					end
 					local finishedCount, validPlayerCount = Room.GetFinishedAndValidCount(currentRoom)
-					if finishedCount >= validPlayerCount and not currentRoom.isAnyPlayerJoining then
+					if finishedCount >= validPlayerCount and not currentRoom.isAnyPlayerJoining and allStarted then
 						currentRoom.status = "ending"
 						for k, v in pairs(currentRoom.players) do
 							RaceServer.PlayerInRoom[v.src] = nil
 							TriggerClientEvent("custom_races:client:showFinalResult", v.src)
 						end
-					elseif currentRoom.status == "racing" and tonumber(currentRoom.roomData.dnf) and (finishedCount / tonumber(currentRoom.roomData.dnf)) >= validPlayerCount and not currentRoom.isAnyPlayerJoining then
+					elseif currentRoom.status == "racing" and tonumber(currentRoom.roomData.dnf) and (finishedCount / tonumber(currentRoom.roomData.dnf)) >= validPlayerCount and not currentRoom.isAnyPlayerJoining and allStarted then
 						currentRoom.status = "dnf"
 						for k, v in pairs(currentRoom.players) do
 							TriggerClientEvent("custom_races:client:startDNFCountdown", v.src, currentRoom.roomId)
@@ -309,7 +316,7 @@ RegisterNetEvent("custom_races:server:acceptInvitation", function(roomId)
 	local playerId = tonumber(source)
 	local playerName = GetPlayerName(playerId)
 	local currentRoom = RaceServer.Rooms[tonumber(roomId)]
-	if currentRoom then
+	if currentRoom and playerName then
 		currentRoom.isAnyPlayerJoining = true
 		if currentRoom.inJoinProgress[playerId] then return end
 		currentRoom.inJoinProgress[playerId] = true
@@ -412,7 +419,7 @@ RegisterNetEvent("custom_races:server:joinPublicRoom", function(roomId)
 	local playerId = tonumber(source)
 	local playerName = GetPlayerName(playerId)
 	local currentRoom = RaceServer.Rooms[tonumber(roomId)]
-	if currentRoom then
+	if currentRoom and playerName then
 		currentRoom.isAnyPlayerJoining = true
 		if currentRoom.inJoinProgress[playerId] then return end
 		currentRoom.inJoinProgress[playerId] = true
@@ -480,6 +487,19 @@ RegisterNetEvent("custom_races:server:raceLoaded", function()
 		for k, v in pairs(currentRoom.players) do
 			if v.src == playerId then
 				v.raceLoaded = true
+				break
+			end
+		end
+	end
+end)
+
+RegisterNetEvent("custom_races:server:raceStarted", function()
+	local playerId = tonumber(source)
+	local currentRoom = RaceServer.Rooms[RaceServer.PlayerInRoom[playerId]]
+	if currentRoom and currentRoom.status == "racing" then
+		for k, v in pairs(currentRoom.players) do
+			if v.src == playerId then
+				v.raceStarted = true
 				break
 			end
 		end

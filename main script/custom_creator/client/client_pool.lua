@@ -1,5 +1,3 @@
-local currentTime = 0
-local lastRefreshTime = 0
 local isObjectSpawningInProgress = false
 local maxFilter = 1024
 local maxScanRadius = 50 -- 50 * 100 meters
@@ -11,6 +9,7 @@ local speedup_duration = {0.3, 0.4, 0.5, 0.5, 0.5}
 local slowdown = {44, 30, 16}
 
 objectPool = {
+	isRefreshing = false,
 	forceLoad = {x = nil, y = nil, z = nil},
 	all = {},
 	grids = {},
@@ -27,10 +26,53 @@ objectPool = {
 	changedObjects = {}
 }
 
+function RefreshGirdForObject(x, y, object)
+	if not x or not y or not object or not object.uniqueId then return end
+	local old_gx = math.floor(x / 100.0)
+	local old_gy = math.floor(y / 100.0)
+	local new_gx = math.floor(object.x / 100.0)
+	local new_gy = math.floor(object.y / 100.0)
+	if (old_gx ~= new_gx) or (old_gy ~= new_gy) then
+		if objectPool.grids[old_gx] and objectPool.grids[old_gx][old_gy] then
+			objectPool.grids[old_gx][old_gy][object.uniqueId] = nil
+		end
+		objectPool.grids[new_gx] = objectPool.grids[new_gx] or {}
+		objectPool.grids[new_gx][new_gy] = objectPool.grids[new_gx][new_gy] or {}
+		objectPool.grids[new_gx][new_gy][object.uniqueId] = object
+		objectPool.all[object.uniqueId] = new_gx .. "-" .. new_gy
+	end
+end
+
+function RefreshAllGirds()
+	Citizen.CreateThread(function()
+		DisplayBusyspinner("refresh", 10000, #currentRace.objects + 10000)
+		Citizen.Wait(1000)
+		local count = 0
+		objectPool.all = {}
+		objectPool.grids = {}
+		for _, object in pairs(currentRace.objects) do
+			local gx = math.floor(object.x / 100.0)
+			local gy = math.floor(object.y / 100.0)
+			objectPool.grids[gx] = objectPool.grids[gx] or {}
+			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
+			objectPool.grids[gx][gy][object.uniqueId] = object
+			objectPool.all[object.uniqueId] = gx .. "-" .. gy
+			count = count + 1
+			if count >= 10000 then
+				count = 0
+				Citizen.Wait(1000)
+			end
+		end
+		RemoveLoadingPrompt()
+		global_var.status = ""
+		objectPool.isRefreshing = false
+	end)
+end
+
 function IsNearbyObjectsSpawned(x, y)
 	local gx = math.floor(x / 100.0)
 	local gy = math.floor(y / 100.0)
-	if objectPool.grids[gx] and objectPool.grids[gx][gy] and #objectPool.grids[gx][gy] > 0 then
+	if objectPool.grids[gx] and objectPool.grids[gx][gy] and TableCount(objectPool.grids[gx][gy]) > 0 then
 		if not objectPool.activeGrids[gx .. "-" .. gy] then
 			return false
 		end
@@ -39,8 +81,8 @@ function IsNearbyObjectsSpawned(x, y)
 end
 
 function GetNearbyObjects(pos, gx, gy)
-	if objectPool.grids[gx] and objectPool.grids[gx][gy] and #objectPool.grids[gx][gy] > 0 then
-		for i, object in pairs(objectPool.grids[gx][gy]) do
+	if objectPool.grids[gx] and objectPool.grids[gx][gy] and TableCount(objectPool.grids[gx][gy]) > 0 then
+		for uniqueId, object in pairs(objectPool.grids[gx][gy]) do
 			if not objectPool.filterAdded[object.uniqueId] then
 				local _, _, radius = GetModelDimensionsInCaches(object.hash)
 				objectPool.filter[#objectPool.filter + 1] = {
@@ -60,7 +102,7 @@ function SpawnNearbyObjects()
 		isObjectSpawningInProgress = true
 		Citizen.CreateThread(function()
 			while global_var.enableCreator do
-				if not global_var.quitingTest and not global_var.joiningTest then
+				if not global_var.quitingTest and not global_var.joiningTest and not objectPool.isRefreshing then
 					local pos = vector3(0.0, 0.0, 0.0)
 					if objectPool.forceLoad.x and objectPool.forceLoad.y and objectPool.forceLoad.z then
 						pos = vector3(objectPool.forceLoad.x, objectPool.forceLoad.y, objectPool.forceLoad.z)
@@ -77,20 +119,6 @@ function SpawnNearbyObjects()
 					objectPool.effectsFilter = {}
 					objectPool.effectsFilterKeep = {}
 					objectPool.activeGrids = {}
-					currentTime = GetGameTimer()
-					if currentTime - lastRefreshTime >= 60000 then
-						lastRefreshTime = currentTime
-						objectPool.all = {}
-						objectPool.grids = {}
-						for _, object in pairs(currentRace.objects) do
-							local gx = math.floor(object.x / 100.0)
-							local gy = math.floor(object.y / 100.0)
-							objectPool.grids[gx] = objectPool.grids[gx] or {}
-							objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-							objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
-							objectPool.all[object.uniqueId] = gx .. "-" .. gy
-						end
-					end
 					if isPropPickedUp and currentObject.uniqueId then
 						if objectPool.all[currentObject.uniqueId] then
 							objectPool.filter[#objectPool.filter + 1] = {
@@ -262,8 +290,6 @@ function SpawnNearbyObjects()
 			objectPool.activeObjects = {}
 			objectPool.activeEffects = {}
 			objectPool.changedObjects = {}
-			currentTime = 0
-			lastRefreshTime = 0
 			isObjectSpawningInProgress = false
 		end)
 	end

@@ -20,9 +20,9 @@ RegisterNetEvent("custom_creator:client:info", function(str, info)
 	elseif str == "join-session-trying" then
 		DisplayCustomMsgs(GetTranslate("join-session-trying"))
 	elseif str == "track-list" then
-		DisplayBusyspinner("load", info)
+		DisplayBusyspinner("load", 65536, info)
 	elseif str == "track-download" then
-		DisplayBusyspinner("download", info)
+		DisplayBusyspinner("download", 65536, info)
 	end
 end)
 
@@ -463,6 +463,8 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 					end
 				end
 			elseif nuiCallBack == "prop x" and currentObject.handle then
+				local old_x = currentObject.x
+				local old_y = currentObject.y
 				currentObject.x = RoundedValue(value + 0.0, 3)
 				SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 				if isPropPickedUp then
@@ -470,8 +472,11 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 						currentObject.modificationCount = currentObject.modificationCount + 1
 						TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-change")
 					end
+					RefreshGirdForObject(old_x, old_y, currentObject)
 				end
 			elseif nuiCallBack == "prop y" and currentObject.handle then
+				local old_x = currentObject.x
+				local old_y = currentObject.y
 				currentObject.y = RoundedValue(value + 0.0, 3)
 				SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 				if isPropPickedUp then
@@ -479,6 +484,7 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 						currentObject.modificationCount = currentObject.modificationCount + 1
 						TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-change")
 					end
+					RefreshGirdForObject(old_x, old_y, currentObject)
 				end
 			elseif nuiCallBack == "prop z" and currentObject.handle then
 				local newZ = RoundedValue(value + 0.0, 3)
@@ -585,6 +591,8 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 				if nuiCallBack == "prop override" and currentObject.handle then
 					local newZ = RoundedValue(tonumber(z) + 0.0, 3)
 					if (newZ > -198.99) and (newZ <= 2698.99) then
+						local old_x = currentObject.x
+						local old_y = currentObject.y
 						currentObject.x = RoundedValue(tonumber(x) + 0.0, 3)
 						currentObject.y = RoundedValue(tonumber(y) + 0.0, 3)
 						currentObject.z = RoundedValue(tonumber(z) + 0.0, 3)
@@ -614,6 +622,7 @@ RegisterNUICallback("custom_creator:submit", function(data, cb)
 							globalRot.x = RoundedValue(currentObject.rotX, 3)
 							globalRot.y = RoundedValue(currentObject.rotY, 3)
 							globalRot.z = RoundedValue(currentObject.rotZ, 3)
+							RefreshGirdForObject(old_x, old_y, currentObject)
 						end
 					else
 						DisplayCustomMsgs(GetTranslate("z-limit"))

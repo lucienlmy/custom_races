@@ -186,7 +186,7 @@ RegisterNetEvent("custom_races:server:setFavorite", function(favoriteVehicles)
 	local playerId = tonumber(source)
 	local playerName = GetPlayerName(playerId)
 	local identifier_license = GetPlayerIdentifierByType(playerId, "license")
-	if identifier_license then
+	if identifier_license and playerName then
 		local identifier = identifier_license:gsub("license:", "")
 		local favoriteVehicles_results = MySQL.query.await("SELECT fav_vehs FROM custom_race_users WHERE license = ?", {identifier})
 		if favoriteVehicles_results and favoriteVehicles_results[1] then

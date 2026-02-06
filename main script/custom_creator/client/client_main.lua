@@ -53,6 +53,7 @@ currentRace = {
 }
 
 speed = {
+	key = nil,
 	cam_pos = {
 		index = 1,
 		value = {
@@ -219,6 +220,8 @@ templatePreview_coords_change = false
 isTemplateOverrideRelativeEnable = false
 templatePreview = {}
 currentTemplate = {}
+
+isMoveAllMenuVisible = false
 
 isFixtureRemoverMenuVisible = false
 fixtureIndex = 0
@@ -1150,6 +1153,7 @@ function OpenCreator()
 
 			if RageUI.Visible(PlacementSubMenu_MoveAll) then
 				buttonToDraw = 5
+				isMoveAllMenuVisible = true
 				if not global_var.IsBigmapActive then
 					global_var.IsBigmapActive = true
 					Citizen.CreateThread(function()
@@ -1159,6 +1163,7 @@ function OpenCreator()
 					end)
 				end
 			else
+				isMoveAllMenuVisible = false
 				if global_var.IsBigmapActive then
 					global_var.IsBigmapActive = false
 					if not global_var.RadarBigmapChecked then
@@ -1242,6 +1247,20 @@ function OpenCreator()
 				end
 			end
 
+			if isStartingGridMenuVisible then
+				speed.key = "grid_offset"
+			elseif isCheckpointMenuVisible then
+				speed.key = "checkpoint_offset"
+			elseif isPropMenuVisible then
+				speed.key = "prop_offset"
+			elseif isTemplateMenuVisible then
+				speed.key = "template_offset"
+			elseif isMoveAllMenuVisible then
+				speed.key = "move_offset"
+			else
+				speed.key = nil
+			end
+
 			if camera ~= nil and not global_var.enableTest and not isFireworkMenuVisible then
 				if global_var.IsPauseMenuActive and IsWaypointActive() then
 					local waypoint = GetBlipInfoIdCoord(GetFirstBlipInfoId(GetWaypointBlipEnumId()))
@@ -1249,18 +1268,34 @@ function OpenCreator()
 					DeleteWaypoint()
 				end
 				if IsControlJustPressed(0, global_var.IsUsingKeyboard and 254 or 226) then -- LEFT SHIFT or LB
-					local index = speed.cam_pos.index + 1
-					if index > #speed.cam_pos.value then
-						index = 1
+					if speed.key then
+						local index = speed[speed.key].index - 1
+						if index < 1 then
+							index = #speed[speed.key].value
+						end
+						speed[speed.key].index = index
+					else
+						local index = speed.cam_pos.index + 1
+						if index > #speed.cam_pos.value then
+							index = 1
+						end
+						speed.cam_pos.index = index
 					end
-					speed.cam_pos.index = index
 				end
 				if IsControlJustPressed(0, global_var.IsUsingKeyboard and 326 or 227) then -- LEFT CTRL or RB
-					local index = speed.cam_rot.index + 1
-					if index > #speed.cam_rot.value then
-						index = 1
+					if speed.key then
+						local index = speed[speed.key].index + 1
+						if index > #speed[speed.key].value then
+							index = 1
+						end
+						speed[speed.key].index = index
+					else
+						local index = speed.cam_rot.index + 1
+						if index > #speed.cam_rot.value then
+							index = 1
+						end
+						speed.cam_rot.index = index
 					end
-					speed.cam_rot.index = index
 				end
 				local forward = RageUI.CurrentMenu ~= nil and GetCameraForwardVector() or vector3(0.0, 0.0, 0.0)
 				local forward_2 = RageUI.CurrentMenu ~= nil and GetCameraForwardVector_2() or vector3(0.0, 0.0, 0.0)
@@ -1328,6 +1363,25 @@ function OpenCreator()
 								global_var.propZposLock = newZposLock
 								cameraPosition = vector3(cameraPosition.x + 0.0, cameraPosition.y + 0.0, cameraPosition.z + 0.0 + speed.prop_offset.value[speed.prop_offset.index][2])
 							end
+						end
+					end
+				end
+				if isPropMenuVisible or isTemplateMenuVisible then
+					local gx = math.floor((cameraPosition.x) / 100.0)
+					local gy = math.floor((cameraPosition.y) / 100.0)
+					if objectPool.grids[gx] and objectPool.grids[gx][gy] and TableCount(objectPool.grids[gx][gy]) >= 300 then
+						local r, g, b = GetHudColour(208)
+						local x_min, y_min, z_min, x_max, y_max, z_max = gx * 100, gy * 100, -200.0, gx * 100 + 100.0, gy * 100 + 100.0, 2700.0
+						local corners = {vector3(x_max, y_max, z_max), vector3(x_min, y_max, z_max), vector3(x_max, y_min, z_max), vector3(x_min, y_min, z_max), vector3(x_max, y_max, z_min), vector3(x_min, y_max, z_min), vector3(x_max, y_min, z_min), vector3(x_min, y_min, z_min)}
+						local lines = {{1, 2}, {2, 4}, {4, 3}, {3, 1}, {1, 5}, {2, 6}, {3, 7}, {4, 8}}
+						for _, line in ipairs(lines) do
+							local p1, p2 = corners[line[1]], corners[line[2]]
+							DrawLine(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, 255, 255, 255, 255)
+						end
+						local faces = {{1, 2, 4}, {4, 3, 1}, {2, 1, 5}, {5, 6, 2}, {3, 4, 8}, {8, 7, 3}, {7, 8, 6}, {6, 5, 7}, {4, 2, 6}, {6, 8, 4}, {1, 3, 7}, {7, 5, 1}}
+						for _, face in ipairs(faces) do
+							local p1, p2, p3 = corners[face[1]], corners[face[2]], corners[face[3]]
+							DrawPoly(p3.x, p3.y, p3.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z, r, g, b, 50)
 						end
 					end
 				end
@@ -1888,7 +1942,9 @@ function OpenCreator()
 									SetEntityCollision(templatePreview[i].handle, false, false)
 									FreezeEntityPosition(templatePreview[i].handle, true)
 									if i >= 2 then
-										SetEntityAlpha(templatePreview[i].handle, 150)
+										if global_var.ObjectLowerAlphaChecked then
+											SetEntityAlpha(templatePreview[i].handle, 150)
+										end
 										AttachEntityToEntity(templatePreview[i].handle, templatePreview[1].handle, 0, GetOffsetFromEntityGivenWorldCoords(templatePreview[1].handle, GetEntityCoords(templatePreview[i].handle)), GetEntityRotation(templatePreview[i].handle, 2), false, false, false, false, 2, true, 0)
 									end
 								end
@@ -2182,7 +2238,7 @@ function OpenCreator()
 							)
 							if (#(creator_coords - pos) > 3.6) and (#(creator_coords - pos) < 36.0) then
 								textDrawCount = textDrawCount + 1
-								DrawFloatingTextForCreator(creator_coords.x, creator_coords.y, creator_coords.z, 2.0, GetPlayerName(id), false, color)
+								DrawFloatingTextForCreator(creator_coords.x, creator_coords.y, creator_coords.z, 2.0, GetPlayerName(id) or "unknown", false, color)
 							end
 						end
 						local vehicle_preview = v.startingGridVehiclePreview
@@ -2232,7 +2288,12 @@ function OpenCreator()
 					local is_planeRot = checkpoint.is_planeRot
 					local plane_rot = checkpoint.plane_rot
 					local is_warp = checkpoint.is_warp
-					DrawCheckpointForCreator(x, y, z, heading, pitch, d_collect, d_draw, is_pit, is_tall, is_round, is_air, is_fake, is_random, random_class, is_transform, transform_index, is_planeRot, plane_rot, is_warp, false, global_var.isPrimaryCheckpointItems and highlight, i, false)
+					local onScreen, screenX, screenY = GetScreenCoordFromWorldCoord(x, y, z)
+					if onScreen and #(vector3(x, y, z) - pos) < 1500.0 then
+						markerDrawCount = markerDrawCount + 1
+						DrawCheckpointForCreator(x, y, z, heading, pitch, d_collect, d_draw, is_pit, is_tall, is_round, is_air, is_fake, is_random, random_class, is_transform, transform_index, is_planeRot, plane_rot, is_warp, false, global_var.isPrimaryCheckpointItems and highlight, i, false)
+						if markerDrawCount >= 60 then break end
+					end
 
 					local checkpoint_2 = currentRace.checkpoints_2[i]
 					if checkpoint_2 then
@@ -2256,7 +2317,12 @@ function OpenCreator()
 						local is_planeRot_2 = checkpoint_2.is_planeRot
 						local plane_rot_2 = checkpoint_2.plane_rot
 						local is_warp_2 = checkpoint_2.is_warp
-						DrawCheckpointForCreator(x_2, y_2, z_2, heading_2, pitch_2, d_collect_2, d_draw_2, is_pit_2, is_tall_2, is_round_2, is_air_2, is_fake_2, is_random_2, random_class_2, is_transform_2, transform_index_2, is_planeRot_2, plane_rot_2, is_warp_2, false, not global_var.isPrimaryCheckpointItems and highlight_2, i, true)
+						local onScreen_2, screenX_2, screenY_2 = GetScreenCoordFromWorldCoord(x_2, y_2, z_2)
+						if onScreen_2 and #(vector3(x_2, y_2, z_2) - pos) < 1500.0 then
+							markerDrawCount = markerDrawCount + 1
+							DrawCheckpointForCreator(x_2, y_2, z_2, heading_2, pitch_2, d_collect_2, d_draw_2, is_pit_2, is_tall_2, is_round_2, is_air_2, is_fake_2, is_random_2, random_class_2, is_transform_2, transform_index_2, is_planeRot_2, plane_rot_2, is_warp_2, false, not global_var.isPrimaryCheckpointItems and highlight_2, i, true)
+							if markerDrawCount >= 60 then break end
+						end
 					end
 				end
 			end

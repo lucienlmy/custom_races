@@ -30,6 +30,38 @@ function DisplayCustomMsgs(msg, instantDelete, oldMsgItem)
 	end
 end
 
+function DisplayBusyspinner(str, coefficient, len)
+	if str ~= "" and coefficient and len > 0 then
+		Citizen.CreateThread(function()
+			local loadCount = 0.0
+			local lastCount = nil
+			status = str
+			while status == str do
+				local displayCount = math.floor(loadCount * coefficient * 100 / len)
+				if not lastCount or lastCount ~= displayCount then
+					lastCount = displayCount
+					local text = displayCount .. "%"
+					if str == "load" then
+						text = string.format(GetTranslate("load-progress"), displayCount)
+					elseif str == "download" then
+						text = string.format(GetTranslate("download-progress"), displayCount)
+					elseif str == "parse" then
+						text = string.format(GetTranslate("parse-progress"), displayCount)
+					end
+					RemoveLoadingPrompt()
+					BeginTextCommandBusyString("STRING")
+					AddTextComponentSubstringPlayerName(text)
+					EndTextCommandBusyString(4)
+				end
+				if (loadCount + 0.1) * coefficient <= len then
+					loadCount = loadCount + 0.1
+				end
+				Citizen.Wait(100)
+			end
+		end)
+	end
+end
+
 function CrossVec(vecA, vecB)
 	return vector3(
 		(vecA.y * vecB.z) - (vecA.z * vecB.y),

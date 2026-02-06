@@ -307,9 +307,11 @@ function RageUI.PoolMenus:Creator()
 											RemoveLoadingPrompt()
 											global_var.status = ""
 										end, currentRace.raceid, currentRace)
-										DisplayBusyspinner("sync", #json.encode(currentRace) * 1.02)
+										DisplayBusyspinner("sync", 65536, #json.encode(currentRace) * 1.02)
 									end
 								elseif data and data_2 then
+									inSession = true
+									lockSession = true
 									LoadSessionData(data, data_2)
 									global_var.thumbnailValid = false
 									global_var.previewThumbnail = ""
@@ -322,8 +324,12 @@ function RageUI.PoolMenus:Creator()
 									})
 									DisplayCustomMsgs(GetTranslate("join-session-success"))
 									TriggerServerEvent("custom_creator:server:loadDone", currentRace.raceid)
-									multiplayer.inSessionPlayers = inSessionPlayers
-									inSession = true
+									for i = 1, #inSessionPlayers do
+										table.insert(multiplayer.inSessionPlayers, inSessionPlayers[i])
+									end
+									if #multiplayer.loadingPlayers == 0 then
+										lockSession = false
+									end
 									RemoveLoadingPrompt()
 									global_var.status = ""
 								else
@@ -337,28 +343,28 @@ function RageUI.PoolMenus:Creator()
 				end)
 			end
 		else
-			Items:AddButton(GetTranslate("MainMenu-Button-RaceDetail"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-RaceDetail"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, RaceDetailSubMenu)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Placement"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Placement"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, PlacementSubMenu)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Multiplayer"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Multiplayer"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, MultiplayerSubMenu)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Weather"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Weather"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, WeatherSubMenu)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Time"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Time"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, TimeSubMenu)
 
 			if currentRace.published then
-				Items:AddButton(GetTranslate("MainMenu-Button-Update"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
+				Items:AddButton(GetTranslate("MainMenu-Button-Update"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
 					if (onSelected) then
 						global_var.lock = true
 						Citizen.CreateThread(function()
@@ -383,7 +389,7 @@ function RageUI.PoolMenus:Creator()
 					end
 				end)
 
-				Items:AddButton(GetTranslate("MainMenu-Button-CancelPublish"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or GetTranslate("MainMenu-Button-CancelPublish-Desc"), { IsDisabled = global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
+				Items:AddButton(GetTranslate("MainMenu-Button-CancelPublish"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or GetTranslate("MainMenu-Button-CancelPublish-Desc"), { IsDisabled = objectPool.isRefreshing or global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
 					if (onSelected) then
 						global_var.lock = true
 						Citizen.CreateThread(function()
@@ -408,7 +414,7 @@ function RageUI.PoolMenus:Creator()
 					end
 				end)
 			else
-				Items:AddButton(GetTranslate("MainMenu-Button-Save"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
+				Items:AddButton(GetTranslate("MainMenu-Button-Save"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
 					if (onSelected) then
 						global_var.lock = true
 						Citizen.CreateThread(function()
@@ -440,7 +446,7 @@ function RageUI.PoolMenus:Creator()
 										global_var.status = ""
 										global_var.lock = false
 									end, currentRace.raceid, currentRace)
-									DisplayBusyspinner("sync", #json.encode(currentRace) * 1.02)
+									DisplayBusyspinner("sync", 65536, #json.encode(currentRace) * 1.02)
 								else
 									RemoveLoadingPrompt()
 									global_var.status = ""
@@ -451,7 +457,7 @@ function RageUI.PoolMenus:Creator()
 					end
 				end)
 
-				Items:AddButton(GetTranslate("MainMenu-Button-Publish"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
+				Items:AddButton(GetTranslate("MainMenu-Button-Publish"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
 					if (onSelected) then
 						global_var.lock = true
 						Citizen.CreateThread(function()
@@ -483,7 +489,7 @@ function RageUI.PoolMenus:Creator()
 										global_var.status = ""
 										global_var.lock = false
 									end, currentRace.raceid, currentRace)
-									DisplayBusyspinner("sync", #json.encode(currentRace) * 1.02)
+									DisplayBusyspinner("sync", 65536, #json.encode(currentRace) * 1.02)
 								else
 									RemoveLoadingPrompt()
 									global_var.status = ""
@@ -495,7 +501,7 @@ function RageUI.PoolMenus:Creator()
 				end)
 			end
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Export"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Export"), (not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown")) and GetTranslate("MainMenu-Button-Save-Desc") or nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or not global_var.thumbnailValid or (#currentRace.startingGrid == 0) or (#currentRace.checkpoints < 10) or (#currentRace.objects == 0) or (currentRace.title == "unknown") or lockSession }, function(onSelected)
 				if (onSelected) then
 					global_var.lock = true
 					Citizen.CreateThread(function()
@@ -517,11 +523,11 @@ function RageUI.PoolMenus:Creator()
 				end
 			end)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Misc"), nil, { IsDisabled = global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Misc"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession, RightLabel = "→→→" }, function(onSelected)
 
 			end, MiscSubMenu)
 
-			Items:AddButton(GetTranslate("MainMenu-Button-Exit"), nil, { IsDisabled = global_var.lock or lockSession }, function(onSelected)
+			Items:AddButton(GetTranslate("MainMenu-Button-Exit"), nil, { IsDisabled = objectPool.isRefreshing or global_var.lock or lockSession }, function(onSelected)
 				if (onSelected) then
 					if inSession then
 						inSession = false
@@ -2685,8 +2691,8 @@ function RageUI.PoolMenus:Creator()
 				local gy = math.floor(object.y / 100.0)
 				objectPool.grids[gx] = objectPool.grids[gx] or {}
 				objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-				if #objectPool.grids[gx][gy] < 300 then
-					objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+				if TableCount(objectPool.grids[gx][gy]) < 300 then
+					objectPool.grids[gx][gy][object.uniqueId] = object
 					objectPool.all[object.uniqueId] = gx .. "-" .. gy
 					if effectObjects[object.hash] then
 						objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
@@ -2699,11 +2705,9 @@ function RageUI.PoolMenus:Creator()
 				else
 					DisplayCustomMsgs(GetTranslate("300-limit"))
 				end
-				globalRot = {
-					x = RoundedValue(currentObject.rotX, 3),
-					y = RoundedValue(currentObject.rotY, 3),
-					z = RoundedValue(currentObject.rotZ, 3)
-				}
+				globalRot.x = RoundedValue(currentObject.rotX, 3)
+				globalRot.y = RoundedValue(currentObject.rotY, 3)
+				globalRot.z = RoundedValue(currentObject.rotZ, 3)
 				global_var.propColor = currentObject.color
 				ResetGlobalVariable("currentObject")
 			end
@@ -2855,6 +2859,8 @@ function RageUI.PoolMenus:Creator()
 		end
 
 		Items:AddList("X:", { currentObject.handle and currentObject.x or "" }, 1, nil, { IsDisabled = not currentObject.handle or not currentObject.x or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
+			local old_x = currentObject.x
+			local old_y = currentObject.y
 			if (onListChange) == "left" then
 				if not isPropOverrideRelativeEnable then
 					currentObject.x = RoundedValue(currentObject.x - speed.prop_offset.value[speed.prop_offset.index][2], 3)
@@ -2866,6 +2872,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.y = RoundedValue(coords.y, 3)
 						currentObject.z = RoundedValue(coords.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
+						global_var.propZposLock = currentObject.z
 					else
 						DisplayCustomMsgs(GetTranslate("z-limit"))
 					end
@@ -2881,6 +2888,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.y = RoundedValue(coords.y, 3)
 						currentObject.z = RoundedValue(coords.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
+						global_var.propZposLock = currentObject.z
 					else
 						DisplayCustomMsgs(GetTranslate("z-limit"))
 					end
@@ -2908,11 +2916,14 @@ function RageUI.PoolMenus:Creator()
 						currentObject.modificationCount = currentObject.modificationCount + 1
 						TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-change")
 					end
+					RefreshGirdForObject(old_x, old_y, currentObject)
 				end
 			end
 		end)
 
 		Items:AddList("Y:", { currentObject.handle and currentObject.y or "" }, 1, nil, { IsDisabled = not currentObject.handle or not currentObject.y or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
+			local old_x = currentObject.x
+			local old_y = currentObject.y
 			if (onListChange) == "left" then
 				if not isPropOverrideRelativeEnable then
 					currentObject.y = RoundedValue(currentObject.y - speed.prop_offset.value[speed.prop_offset.index][2], 3)
@@ -2924,6 +2935,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.y = RoundedValue(coords.y, 3)
 						currentObject.z = RoundedValue(coords.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
+						global_var.propZposLock = currentObject.z
 					else
 						DisplayCustomMsgs(GetTranslate("z-limit"))
 					end
@@ -2939,6 +2951,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.y = RoundedValue(coords.y, 3)
 						currentObject.z = RoundedValue(coords.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
+						global_var.propZposLock = currentObject.z
 					else
 						DisplayCustomMsgs(GetTranslate("z-limit"))
 					end
@@ -2966,11 +2979,14 @@ function RageUI.PoolMenus:Creator()
 						currentObject.modificationCount = currentObject.modificationCount + 1
 						TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-change")
 					end
+					RefreshGirdForObject(old_x, old_y, currentObject)
 				end
 			end
 		end)
 
 		Items:AddList("Z:", { currentObject.handle and currentObject.z or "" }, 1, nil, { IsDisabled = not currentObject.handle or not currentObject.z or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
+			local old_x = currentObject.x
+			local old_y = currentObject.y
 			if (onListChange) == "left" then
 				if not isPropOverrideRelativeEnable then
 					local newZ = RoundedValue(currentObject.z - speed.prop_offset.value[speed.prop_offset.index][2], 3)
@@ -3035,6 +3051,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.modificationCount = currentObject.modificationCount + 1
 						TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, currentObject, "objects-change")
 					end
+					RefreshGirdForObject(old_x, old_y, currentObject)
 				end
 			end
 		end)
@@ -3056,6 +3073,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3104,6 +3123,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3124,6 +3144,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			elseif (onListChange) == "right" then
@@ -3142,6 +3163,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3190,6 +3213,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3210,6 +3234,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			end
@@ -3240,6 +3265,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3288,6 +3315,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3308,6 +3336,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			elseif (onListChange) == "right" then
@@ -3326,6 +3355,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3374,6 +3405,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3394,6 +3426,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			end
@@ -3424,6 +3457,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3472,6 +3507,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3492,6 +3528,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			elseif (onListChange) == "right" then
@@ -3510,6 +3547,8 @@ function RageUI.PoolMenus:Creator()
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
 					end
 				else
+					local old_x = currentObject.x
+					local old_y = currentObject.y
 					if propOverrideRotIndex >= 0 and GetEntityBoneCount(currentObject.handle) > 0 then
 						if objectPreview then
 							objectPreview_coords_change = true
@@ -3558,6 +3597,7 @@ function RageUI.PoolMenus:Creator()
 						currentObject.rotZ = RoundedValue(rotation.z, 3)
 						SetEntityCoordsNoOffset(currentObject.handle, currentObject.x, currentObject.y, currentObject.z)
 						SetEntityRotation(currentObject.handle, currentObject.rotX, currentObject.rotY, currentObject.rotZ, 2, 0)
+						global_var.propZposLock = currentObject.z
 					else
 						local w, x, y, z = GetEntityQuaternion(currentObject.handle)
 						local q_current = quat(w, x, y, z)
@@ -3578,6 +3618,7 @@ function RageUI.PoolMenus:Creator()
 						globalRot.x = RoundedValue(currentObject.rotX, 3)
 						globalRot.y = RoundedValue(currentObject.rotY, 3)
 						globalRot.z = RoundedValue(currentObject.rotZ, 3)
+						RefreshGirdForObject(old_x, old_y, currentObject)
 					end
 				end
 			end
@@ -3811,12 +3852,7 @@ function RageUI.PoolMenus:Creator()
 				local gx = math.floor(currentObject.x / 100.0)
 				local gy = math.floor(currentObject.y / 100.0)
 				if objectPool.grids[gx] and objectPool.grids[gx][gy] then
-					for i, object in pairs(objectPool.grids[gx][gy]) do
-						if object.uniqueId == currentObject.uniqueId then
-							table.remove(objectPool.grids[gx][gy], i)
-							break
-						end
-					end
+					objectPool.grids[gx][gy][currentObject.uniqueId] = nil
 				end
 				if objectIndex > #currentRace.objects then
 					objectIndex = #currentRace.objects
@@ -3896,9 +3932,9 @@ function RageUI.PoolMenus:Creator()
 						local gy = math.floor(templatePreview[i].y / 100.0)
 						objectPool.grids[gx] = objectPool.grids[gx] or {}
 						objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-						if #objectPool.grids[gx][gy] < 300 then
+						if TableCount(objectPool.grids[gx][gy]) < 300 then
 							if (templatePreview[i].z > -198.99) and (templatePreview[i].z <= 2698.99) then
-								objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = templatePreview[i]
+								objectPool.grids[gx][gy][templatePreview[i].uniqueId] = templatePreview[i]
 								objectPool.all[templatePreview[i].uniqueId] = gx .. "-" .. gy
 								if effectObjects[templatePreview[i].hash] then
 									objectPool.effects[templatePreview[i].uniqueId] = {ptfxHandle == nil, object = templatePreview[i], style = effectObjects[templatePreview[i].hash]}
@@ -4552,23 +4588,23 @@ function RageUI.PoolMenus:Creator()
 	end, function(Panels)
 	end)
 
-	local selectFixtureAvailable = false
-	local deselectFixtureAvailable = false
-	local foundFixture = false
-	if currentFixture.handle then
-		for k, v in pairs(currentRace.fixtures) do
-			if v.hash == currentFixture.hash then
-				foundFixture = true
-				break
+	PlacementSubMenu_FixtureRemover:IsVisible(function(Items)
+		local selectFixtureAvailable = false
+		local deselectFixtureAvailable = false
+		local foundFixture = false
+		if currentFixture.handle then
+			for k, v in pairs(currentRace.fixtures) do
+				if v.hash == currentFixture.hash then
+					foundFixture = true
+					break
+				end
 			end
 		end
-	end
-	if not foundFixture then
-		selectFixtureAvailable = true
-	else
-		deselectFixtureAvailable = true
-	end
-	PlacementSubMenu_FixtureRemover:IsVisible(function(Items)
+		if not foundFixture then
+			selectFixtureAvailable = true
+		else
+			deselectFixtureAvailable = true
+		end
 		Items:AddList(GetTranslate("PlacementSubMenu_FixtureRemover-List-CycleItems"), { fixtureIndex .. " / " .. #currentRace.fixtures }, 1, nil, { IsDisabled = #currentRace.fixtures == 0 or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
 			if (onListChange) == "left" then
 				local index = fixtureIndex - 1
@@ -4724,6 +4760,8 @@ function RageUI.PoolMenus:Creator()
 							Citizen.CreateThread(function()
 								TriggerServerCallback("custom_creator:server:joinPlayerSession", function(data, data_2, inSessionPlayers)
 									if data and data_2 then
+										inSession = true
+										lockSession = true
 										LoadSessionData(data, data_2)
 										global_var.thumbnailValid = false
 										SendNUIMessage({
@@ -4734,8 +4772,12 @@ function RageUI.PoolMenus:Creator()
 										RageUI.GoBack()
 										DisplayCustomMsgs(GetTranslate("join-session-success"))
 										TriggerServerEvent("custom_creator:server:loadDone", currentRace.raceid)
-										multiplayer.inSessionPlayers = inSessionPlayers
-										inSession = true
+										for i = 1, #inSessionPlayers do
+											table.insert(multiplayer.inSessionPlayers, inSessionPlayers[i])
+										end
+										if #multiplayer.loadingPlayers == 0 then
+											lockSession = false
+										end
 										RemoveLoadingPrompt()
 										global_var.status = ""
 									else
@@ -4918,6 +4960,15 @@ function RageUI.PoolMenus:Creator()
 				TriggerServerEvent("custom_creator:server:saveData", {ObjectLowerAlphaChecked = IsChecked})
 			end
 		end)
+
+		if currentRace.title ~= "" then
+			Items:AddButton(GetTranslate("MiscSubMenu-Button-RefreshGrids"), GetTranslate("MiscSubMenu-Button-RefreshGrids-Desc"), { IsDisabled = objectPool.isRefreshing }, function(onSelected)
+				if (onSelected) then
+					objectPool.isRefreshing = true
+					RefreshAllGirds()
+				end
+			end)
+		end
 	end, function(Panels)
 	end)
 end

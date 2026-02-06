@@ -6,7 +6,7 @@ RegisterNetEvent("custom_creator:server:createSession", function(raceid)
 	if identifier_license then
 		identifier = identifier_license:gsub("license:", "")
 	end
-	if CreatorServer.Sessions[raceid] then return end
+	if CreatorServer.Sessions[raceid] or not playerName then return end
 	CreatorServer.Sessions[raceid] = {
 		sessionId = raceid,
 		creators = { { playerId = playerId, identifier = identifier, playerName = playerName } },

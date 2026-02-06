@@ -46,10 +46,10 @@ function Room.StartRaceRoom(currentRoom, raceid)
 		else
 			data = RaceServer.Data.SearchCaches[currentRoom.ownerId]
 		end
-		local success, len = Room.GetUgcFromData(currentRoom, data)
+		local success, exist = Room.GetUgcFromData(currentRoom, data)
 		if success then
+			local dataLen = #json.encode(currentRoom.ugcData) * 1.02
 			for k, v in pairs(currentRoom.players) do
-				TriggerClientEvent("custom_races:client:countDown", v.src)
 				Room.InitDriverInfos(currentRoom, v.src, v.nick)
 				local identifier_license = GetPlayerIdentifierByType(v.src, "license")
 				local personalVehicles = nil
@@ -60,15 +60,16 @@ function Room.StartRaceRoom(currentRoom, raceid)
 						personalVehicles = json.decode(results[1].vehicle_mods)
 					end
 				end
-				TriggerClientEvent("custom_races:client:startRaceRoom", v.src, currentRoom.playerVehicles[v.src] or currentRoom.predefinedVehicle, personalVehicles or {}, false, len)
+				TriggerClientEvent("custom_races:client:info", v.src, "track-download", dataLen, false)
+				TriggerLatentClientEvent("custom_races:client:loadTrack", v.src, 65536, currentRoom.roomData, currentRoom.ugcData, currentRoom.roomId, k, currentRoom.playerVehicles[v.src] or currentRoom.predefinedVehicle, personalVehicles or {}, false, RaceServer.ScriptStartTime)
 			end
 			currentRoom.startTime = GetGameTimer()
-			currentRoom.timeOut = currentRoom.timeOut + (len * 1000 / 65536)
+			currentRoom.timeOut = currentRoom.timeOut + (dataLen * 1000 / 65536) + ((currentRoom.ugcData.mission.prop.no + currentRoom.ugcData.mission.dprop.no + 10000) * 1000 / 10000)
 		else
 			currentRoom.status = "invalid"
 			for k, v in pairs(currentRoom.players) do
 				RaceServer.PlayerInRoom[v.src] = nil
-				TriggerClientEvent("custom_races:client:exitRoom", v.src, len and "file-not-valid" or "file-not-exist")
+				TriggerClientEvent("custom_races:client:exitRoom", v.src, exist and "file-not-valid" or "file-not-exist")
 			end
 		end
 		RaceServer.Data.SearchCaches[currentRoom.ownerId] = nil
@@ -245,10 +246,7 @@ function Room.GetUgcFromData(currentRoom, data)
 			}
 		}
 	}
-	for k, v in pairs(currentRoom.players) do
-		TriggerLatentClientEvent("custom_races:client:loadTrack", v.src, 65536, currentRoom.roomData, currentRoom.ugcData, currentRoom.roomId, k, RaceServer.ScriptStartTime)
-	end
-	return true, #json.encode(currentRoom.ugcData) * 1.02
+	return true, 1
 end
 
 function Room.InvitePlayer(currentRoom, playerId, roomId, inviteId)
@@ -340,8 +338,6 @@ function Room.JoinRaceMidway(currentRoom, playerId, playerName, fromInvite)
 	table.insert(currentRoom.players, {nick = playerName, src = playerId, ownerRace = false, vehicle = currentRoom.roomData.vehicle == "specific" and currentRoom.players[1] and currentRoom.players[1].vehicle or false})
 	currentRoom.invitations[playerId] = nil
 	currentRoom.syncNextFrame = true
-	TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", playerId, currentRoom.roomData, false)
-	TriggerLatentClientEvent("custom_races:client:loadTrack", playerId, 65536, currentRoom.roomData, currentRoom.ugcData, currentRoom.roomId, 1, RaceServer.ScriptStartTime)
 	Room.InitDriverInfos(currentRoom, playerId, playerName)
 	local identifier_license = GetPlayerIdentifierByType(playerId, "license")
 	local personalVehicles = nil
@@ -352,7 +348,9 @@ function Room.JoinRaceMidway(currentRoom, playerId, playerName, fromInvite)
 			personalVehicles = json.decode(results[1].vehicle_mods)
 		end
 	end
-	TriggerClientEvent("custom_races:client:startRaceRoom", playerId, currentRoom.predefinedVehicle, personalVehicles or {}, true, #json.encode(currentRoom.ugcData) * 1.02)
+	TriggerClientEvent(fromInvite and "custom_races:client:joinPlayerRoom" or "custom_races:client:joinPublicRoom", playerId, currentRoom.roomData, false)
+	TriggerClientEvent("custom_races:client:info", playerId, "track-download", #json.encode(currentRoom.ugcData) * 1.02, true)
+	TriggerLatentClientEvent("custom_races:client:loadTrack", playerId, 65536, currentRoom.roomData, currentRoom.ugcData, currentRoom.roomId, 1, currentRoom.predefinedVehicle, personalVehicles or {}, true, RaceServer.ScriptStartTime)
 	for k, v in pairs(currentRoom.players) do
 		if v.src ~= playerId then
 			TriggerClientEvent("custom_races:client:playerJoinRace", v.src, playerName)

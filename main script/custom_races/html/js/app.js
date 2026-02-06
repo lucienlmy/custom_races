@@ -5,6 +5,7 @@ let need_refresh = false;
 
 //Status
 let firstLoad = true;
+let inInvitationUI = false;
 let inSpectatorMode = false;
 let resetLeaveRoom = false;
 let resetShowMenu = false;
@@ -521,42 +522,35 @@ function openRaceLobby(isInRace) {
 }
 
 function openInvitations() {
+	inInvitationUI = true;
+	eventKeydownInvitation();
+	$(".invitations").addClass("expanded").fadeIn(300);
 	if ($(".invitations-count").text() != 0) {
-		$(".no-invitations").hide();
 		$(".room-invitations").show();
-		$(".invitations").addClass("expanded").fadeIn(300);
-		eventKeydownInvitation();
+		$(".no-invitations").hide();
 	} else {
-		$(".no-invitations").show();
 		$(".room-invitations").hide();
-		$(".invitations").addClass("expanded").fadeIn(300);
-		setTimeout(() => {
-			$(".no-invitations").hide();
-			$(".invitations").removeClass("expanded");
-			setTimeout(() => {
-				if ($(".invitations-count").text() == 0) {
-					$(".invitations").fadeOut(300);
-				}
-			}, 500)
-			$.post(`https://${GetParentResourceName()}/custom_races:nui:closeNUI`);
-		}, 5000)
+		$(".no-invitations").show();
 	}
 }
 
 function updateInvitations() {
 	$(".invitations-count").text($(".invitation").length);
-	if ($(".invitation").length != 0) {
-		$(".no-invitations").hide();
+	if ($(".invitations-count").text() != 0) {
 		$(".room-invitations").show();
+		$(".no-invitations").hide();
 		$(".invitations").fadeIn(300);
 	} else {
 		$(".room-invitations").hide();
-		$(".invitations").removeClass("expanded");
-		setTimeout(() => {
-			if ($(".invitations-count").text() == 0) {
-				$(".invitations").fadeOut(300);
-			}
-		}, 500);
+		if (inInvitationUI) {
+			$(".no-invitations").show();
+		} else {
+			setTimeout(() => {
+				if (($(".invitations-count").text() == 0) && (!inInvitationUI)) {
+					$(".invitations").fadeOut(300);
+				};
+			}, 500)
+		}
 	}
 }
 
@@ -588,10 +582,6 @@ function receiveInvitation(title, name, roomid, accept, cancel) {
 						$(this).remove();
 						updateInvitations();
 						$.post(`https://${GetParentResourceName()}/custom_races:nui:denyInvitation`, JSON.stringify({ src: roomid }));
-						if ($(".invitations-count").text() == 0) {
-							$(document).off("keydown");
-							$.post(`https://${GetParentResourceName()}/custom_races:nui:closeNUI`);
-						}
 					}
 				);
 		});
@@ -610,6 +600,7 @@ function receiveInvitation(title, name, roomid, accept, cancel) {
 					300,
 					function () {
 						$(this).remove();
+						inInvitationUI = false;
 						updateInvitations();
 						$.post(`https://${GetParentResourceName()}/custom_races:nui:acceptInvitation`, JSON.stringify({ src: roomid }));
 						$(".invitations").removeClass("expanded");
@@ -1793,7 +1784,14 @@ function eventKeydownInvitation() {
 		var keycode = event.keyCode ? event.keyCode : event.which;
 		if (keycode == "27") {
 			$(document).off("keydown");
+			inInvitationUI = false;
 			$(".invitations").removeClass("expanded");
+			$(".no-invitations").hide();
+			setTimeout(() => {
+				if (($(".invitations-count").text() == 0) && (!inInvitationUI)) {
+					$(".invitations").fadeOut(300);
+				};
+			}, 500)
 			$.post(`https://${GetParentResourceName()}/custom_races:nui:closeMenu`, JSON.stringify({}));
 		}
 	});

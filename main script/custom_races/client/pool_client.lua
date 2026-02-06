@@ -27,7 +27,7 @@ objectPool = {
 function IsNearbyObjectsSpawned(x, y)
 	local gx = math.floor(x / 100.0)
 	local gy = math.floor(y / 100.0)
-	if objectPool.grids[gx] and objectPool.grids[gx][gy] and #objectPool.grids[gx][gy] > 0 then
+	if objectPool.grids[gx] and objectPool.grids[gx][gy] and TableCount(objectPool.grids[gx][gy]) > 0 then
 		if not objectPool.activeGrids[gx .. "-" .. gy] then
 			return false
 		end
@@ -36,8 +36,8 @@ function IsNearbyObjectsSpawned(x, y)
 end
 
 function GetNearbyObjects(pos, gx, gy)
-	if objectPool.grids[gx] and objectPool.grids[gx][gy] and #objectPool.grids[gx][gy] > 0 then
-		for i, object in pairs(objectPool.grids[gx][gy]) do
+	if objectPool.grids[gx] and objectPool.grids[gx][gy] and TableCount(objectPool.grids[gx][gy]) > 0 then
+		for uniqueId, object in pairs(objectPool.grids[gx][gy]) do
 			if not objectPool.filterAdded[object.uniqueId] then
 				local _, _, radius = GetModelDimensionsInCaches(object.hash)
 				objectPool.filter[#objectPool.filter + 1] = {

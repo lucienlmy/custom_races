@@ -8,7 +8,6 @@ StatSetInt(`MP0_STAMINA`, 100, true)
 
 inRoom = false
 inVehicleUI = false
-isPedVisible = false
 status = "freemode"
 joinRacePoint = nil
 joinRaceHeading = nil
@@ -18,12 +17,10 @@ timeServerSide = {
 	["syncPlayers"] = nil,
 	["scriptStartTime"] = 0
 }
-dataLen = 1024
 dataOutdated = true
 enableXboxController = false
 local isCreatorEnable = false
 local needRefreshTag = false
-local showLoadingPrompt = false
 local togglePositionUI = false
 local currentUiPage = 1
 local arenaProps = {}
@@ -87,7 +84,6 @@ local currentRace = {
 	drivers = {},
 	lastVehicle = nil,
 	default_vehicle = nil,
-	use_room_vehicle = false,
 	random_vehicles = {},
 	gridPositionIndex = 1,
 	startingGrid = {
@@ -119,9 +115,11 @@ function JoinRace()
 	isRespawningInProgress = true
 	RespawnVehicle(currentRace.startingGrid[currentRace.gridPositionIndex].x, currentRace.startingGrid[currentRace.gridPositionIndex].y, currentRace.startingGrid[currentRace.gridPositionIndex].z, currentRace.startingGrid[currentRace.gridPositionIndex].heading, false, nil)
 	isRespawningInProgress = false
-	isPedVisible = IsEntityVisible(PlayerPedId())
+	local ped = PlayerPedId()
+	RemoveAllPedWeapons(ped, false)
+	SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
 	NetworkSetFriendlyFireOption(true)
-	SetCanAttackFriendly(PlayerPedId(), true, true)
+	SetCanAttackFriendly(ped, true, true)
 	CreateBlipForRace(actualCheckpoint, actualLap)
 	CreateCheckpointForRace(actualCheckpoint, false, actualCheckpoint == #currentRace.checkpoints and actualLap == currentRace.laps)
 	CreateCheckpointForRace(actualCheckpoint, true, actualCheckpoint == #currentRace.checkpoints and actualLap == currentRace.laps)
@@ -131,13 +129,11 @@ function JoinRace()
 end
 
 function StartRace()
-	status = "starting"
 	SendNUIMessage({
 		action = "nui_msg:showRaceInfo",
 		racename = currentRace.title
 	})
 	Citizen.Wait(4000)
-	if status ~= "starting" then return end
 	status = "racing"
 	Citizen.CreateThread(function()
 		SendNUIMessage({
@@ -151,6 +147,7 @@ function StartRace()
 		if currentRace.mode == "gta" then
 			GiveWeapons(PlayerPedId())
 		end
+		TriggerServerEvent("custom_races:server:raceStarted")
 		local wasJumping = false
 		local wasOnFoot = false
 		local wasJumped = false
@@ -1378,7 +1375,7 @@ function RespawnVehicle(posX, posY, posZ, heading, engine, checkpoint, cb)
 		Citizen.CreateThread(function()
 			Citizen.Wait(500)
 			local myServerId = GetPlayerServerId(PlayerId())
-			while not isRespawningInProgress and (status == "ready" or status == "starting" or status == "racing") do
+			while not isRespawningInProgress and (status == "ready" or status == "racing") do
 				local myCoords = GetEntityCoords(PlayerPedId())
 				local isPedNearMe = false
 				for _, driver in pairs(currentRace.drivers) do
@@ -1820,7 +1817,6 @@ function ResetClient()
 		drivers = {},
 		lastVehicle = nil,
 		default_vehicle = nil,
-		use_room_vehicle = false,
 		random_vehicles = {},
 		gridPositionIndex = 1,
 		startingGrid = {
@@ -1851,7 +1847,7 @@ function ResetClient()
 	SetPedArmour(ped, 100)
 	SetEntityHealth(ped, 200)
 	SetBlipAlpha(GetMainPlayerBlipId(), 255)
-	SetEntityVisible(ped, isPedVisible)
+	SetEntityVisible(ped, true)
 	ClearPedBloodDamage(ped)
 	ClearPedWetness(ped)
 	SetLocalPlayerAsGhost(false)
@@ -1917,8 +1913,6 @@ function LeaveRace()
 				end
 				SetEntityCoords(joinRaceVehicle, joinRacePoint)
 				SetEntityHeading(joinRaceVehicle, joinRaceHeading)
-				SetEntityVisible(joinRaceVehicle, true)
-				SetEntityCollision(joinRaceVehicle, true, true)
 				SetPedIntoVehicle(ped, joinRaceVehicle, -1)
 			else
 				SetEntityCoords(ped, joinRacePoint)
@@ -1945,10 +1939,6 @@ function LeaveRace()
 			NetworkResurrectLocalPlayer(pos[1], pos[2], pos[3], heading, true, false)
 		end
 		FreezeEntityPosition(ped, false)
-		if DoesEntityExist(joinRaceVehicle) then
-			FreezeEntityPosition(joinRaceVehicle, false)
-			ActivatePhysics(joinRaceVehicle)
-		end
 		joinRacePoint = nil
 		joinRaceHeading = nil
 		joinRaceVehicle = 0
@@ -1984,8 +1974,6 @@ function EndRace()
 				end
 				SetEntityCoords(joinRaceVehicle, joinRacePoint)
 				SetEntityHeading(joinRaceVehicle, joinRaceHeading)
-				SetEntityVisible(joinRaceVehicle, true)
-				SetEntityCollision(joinRaceVehicle, true, true)
 				SetPedIntoVehicle(ped, joinRaceVehicle, -1)
 			else
 				SetEntityCoords(ped, joinRacePoint)
@@ -2012,10 +2000,6 @@ function EndRace()
 			NetworkResurrectLocalPlayer(pos[1], pos[2], pos[3], heading, true, false)
 		end
 		FreezeEntityPosition(ped, false)
-		if DoesEntityExist(joinRaceVehicle) then
-			FreezeEntityPosition(joinRaceVehicle, false)
-			ActivatePhysics(joinRaceVehicle)
-		end
 		joinRacePoint = nil
 		joinRaceHeading = nil
 		joinRaceVehicle = 0
@@ -2293,18 +2277,6 @@ function SetCurrentRace()
 		end
 		ReleaseNamedRendertarget("blimp_text")
 	end)
-	-- Loop get fps and sync to other players
-	Citizen.CreateThread(function()
-		Citizen.Wait(3000)
-		while status == "loading_track" or status == "ready" or status == "starting" or status == "racing" do
-			local startCount = GetFrameCount()
-			Citizen.Wait(1000)
-			local endCount = GetFrameCount()
-			local fps = endCount - startCount - 1
-			if fps <= 0 then fps = 1 end
-			syncData.fps = fps
-		end
-	end)
 end
 
 function SetFireworks()
@@ -2347,7 +2319,7 @@ function RemoveFixtures()
 				hide[v.hash] = true
 			end
 			while status ~= "freemode" do
-				if status == "starting" or status == "racing" or status == "spectating" then
+				if status == "racing" or status == "spectating" then
 					local spawn = {}
 					for uniqueId, object in pairs(objectPool.activeObjects) do
 						if object.handle then
@@ -2384,7 +2356,13 @@ end
 
 function StartSyncDataToServer()
 	Citizen.CreateThread(function()
-		while status == "ready" or status == "starting" or status == "racing" do
+		while status == "ready" or status == "racing" do
+			local startCount = GetFrameCount()
+			Citizen.Wait(1000)
+			local endCount = GetFrameCount()
+			local fps = endCount - startCount - 1
+			if fps <= 0 then fps = 1 end
+			syncData.fps = fps
 			TriggerServerEvent("custom_races:server:clientSync", {
 				syncData.fps,
 				syncData.actualLap,
@@ -2397,17 +2375,19 @@ function StartSyncDataToServer()
 				syncData.lastCheckpointPair,
 				IsUsingKeyboard()
 			}, GetGameTimer())
-			Citizen.Wait(500)
 		end
 	end)
 end
 
-RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomId, gridPositionIndex, gameTimer)
-	if timeServerSide["scriptStartTime"] ~= gameTimer then return end
-	status = "loading_track"
+RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomId, gridPositionIndex, vehicle, personals, joinMidway, gameTimer)
+	if (timeServerSide["scriptStartTime"] ~= gameTimer) then return end
+	if GetResourceState("spawnmanager") == "started" and exports.spawnmanager and exports.spawnmanager.setAutoSpawn then
+		exports.spawnmanager:setAutoSpawn(false)
+	end
 	TriggerEvent("custom_races:loadrace")
 	TriggerServerEvent("custom_core:server:inRace", true)
 	SetLocalPlayerAsGhost(true)
+	DisplayBusyspinner("parse", 10000, data.mission.prop.no + data.mission.dprop.no + 10000)
 	currentRace.roomId = roomId
 	currentRace.owner_name = data.mission.gen.ownerid
 	currentRace.title = data.mission.gen.nm
@@ -2422,12 +2402,8 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 	currentRace.drivers = {}
 	currentRace.lastVehicle = nil
 	currentRace.default_vehicle = nil
-	currentRace.use_room_vehicle = roomData.vehicle ~= "default" and true or false
 	currentRace.random_vehicles = {}
 	UpdatePauseMenuInfo()
-	if joinRaceVehicle ~= 0 and not currentRace.use_room_vehicle then
-		raceVehicle = GetVehicleProperties(joinRaceVehicle) or {}
-	end
 	local adlcs = {data.mission.race.adlc, data.mission.race.adlc2, data.mission.race.adlc3}
 	local aveh = data.mission.race.aveh
 	local clbs = data.mission.race.clbs
@@ -2483,6 +2459,27 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 					currentRace.default_vehicle = random_vehicles[math.random(#random_vehicles)]
 				end
 			end
+		end
+	end
+	if roomData.vehicle ~= "default" then
+		raceVehicle = vehicle or "bmx"
+	else
+		raceVehicle = GetVehicleProperties(joinRaceVehicle) or {}
+		if type(raceVehicle) == "table" and not raceVehicle.model then
+			raceVehicle = currentRace.default_vehicle or "bmx"
+		end
+	end
+	if type(raceVehicle) == "table" then
+		syncData.vehicle = raceVehicle.model and GetDisplayNameFromVehicleModel(raceVehicle.model) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(raceVehicle.model) or "Unknown"
+	elseif type(raceVehicle) == "number" then
+		syncData.vehicle = GetDisplayNameFromVehicleModel(raceVehicle) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(raceVehicle) or "Unknown"
+	elseif type(raceVehicle) == "string" then
+		syncData.vehicle = GetDisplayNameFromVehicleModel(GetHashKey(raceVehicle)) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(GetHashKey(raceVehicle)) or "Unknown"
+	end
+	personalVehicles = {}
+	for k, v in pairs(personals) do
+		if v.plate then
+			personalVehicles[v.plate] = v
 		end
 	end
 	currentRace.transformVehicles = data.mission.race.trfmvm
@@ -2621,8 +2618,8 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 			}
 		end
 	end
-	SetCurrentRace()
-	Citizen.Wait(500)
+	Citizen.Wait(1000)
+	local count = 0
 	local validModels = {}
 	local invalidObjects = {}
 	local globalUniqueId = 0
@@ -2678,13 +2675,18 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 			end
 			if fireworkObjects[object.hash] then
 				fireworkProps[#fireworkProps + 1] = object
+			end
+			count = count + 1
+			if count >= 10000 then
+				count = 0
+				Citizen.Wait(1000)
 			end
 		else
 			invalidObjects[model] = true
@@ -2735,7 +2737,7 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
@@ -2748,6 +2750,11 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 			end
 			if fireworkObjects[object.hash] then
 				fireworkProps[#fireworkProps + 1] = object
+			end
+			count = count + 1
+			if count >= 10000 then
+				count = 0
+				Citizen.Wait(1000)
 			end
 		else
 			invalidObjects[object.hash] = true
@@ -2762,108 +2769,32 @@ RegisterNetEvent("custom_races:client:loadTrack", function(roomData, data, roomI
 		print("Tutorial: https://github.com/taoletsgo/custom_races/issues/9#issuecomment-2552734069")
 		print("Or you can just ignore this message")
 	end
+	SetCurrentRace()
 	SpawnNearbyObjects()
 	SetFireworks()
 	RemoveFixtures()
+	RemoveLoadingPrompt()
+	JoinRace()
+	StartSyncDataToServer()
+	Citizen.Wait(1000)
+	SwitchInPlayer(PlayerPedId())
 	while IsPlayerSwitchInProgress() do Citizen.Wait(0) end
+	enableXboxController = false
 	for k, v in pairs(invalidObjects) do
 		DisplayCustomMsgs(string.format(GetTranslate("object-hash-null"), k), false, nil)
 	end
-end)
-
-RegisterNetEvent("custom_races:client:startRaceRoom", function(vehicle, personals, joinMidway, len)
-	Citizen.CreateThread(function()
-		Citizen.Wait(5000)
-		StopScreenEffect("MenuMGIn")
-		SendNUIMessage({
-			action = "nui_msg:hideLoad"
-		})
-	end)
-	if len > 0 then
-		Citizen.CreateThread(function()
-			local loadCount = 0.0
-			local lastCount = nil
-			local breakCount = 0
-			while status == "freemode" do
-				local displayCount = math.floor(loadCount * 65536 * 100 / len)
-				if not lastCount or lastCount ~= displayCount then
-					lastCount = displayCount
-					RemoveLoadingPrompt()
-					BeginTextCommandBusyString("STRING")
-					AddTextComponentSubstringPlayerName(string.format(GetTranslate("download-progress"), displayCount))
-					EndTextCommandBusyString(4)
-				end
-				if (loadCount + 0.1) * 65536 <= len then
-					loadCount = loadCount + 0.1
-				else
-					breakCount = breakCount + 1
-					if breakCount >= 20 then
-						break
-					end
-				end
-				Citizen.Wait(100)
-			end
-			RemoveLoadingPrompt()
-		end)
-	end
-	if GetResourceState("spawnmanager") == "started" and exports.spawnmanager and exports.spawnmanager.setAutoSpawn then
-		exports.spawnmanager:setAutoSpawn(false)
-	end
-	local ped = PlayerPedId()
-	RemoveAllPedWeapons(ped, false)
-	SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"))
-	Citizen.Wait(2000)
-	while status == "freemode" do Citizen.Wait(0) end
-	Citizen.Wait(1000)
-	SetEntityCoords(ped, currentRace.startingGrid[1].x, currentRace.startingGrid[1].y, currentRace.startingGrid[1].z)
-	SetEntityHeading(ped, currentRace.startingGrid[1].heading)
-	SwitchInPlayer(ped)
-	Citizen.Wait(1000)
-	if DoesEntityExist(joinRaceVehicle) then
-		SetEntityVisible(joinRaceVehicle, false)
-		SetEntityCollision(joinRaceVehicle, false, false)
-		FreezeEntityPosition(joinRaceVehicle, true)
-	end
-	Citizen.Wait(1000)
-	if currentRace.use_room_vehicle then
-		raceVehicle = vehicle or "bmx"
+	if joinMidway then
+		if status == "ready" then
+			StartRace()
+		end
 	else
-		if type(raceVehicle) == "table" and not raceVehicle.model then
-			raceVehicle = currentRace.default_vehicle or "bmx"
+		TriggerServerEvent("custom_races:server:raceLoaded")
+		Citizen.Wait(5000)
+		while status == "ready" do
+			DisplayCustomMsgs(GetTranslate("wait-players"), false, nil)
+			Citizen.Wait(10000)
 		end
 	end
-	if type(raceVehicle) == "table" then
-		syncData.vehicle = raceVehicle.model and GetDisplayNameFromVehicleModel(raceVehicle.model) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(raceVehicle.model) or "Unknown"
-	elseif type(raceVehicle) == "number" then
-		syncData.vehicle = GetDisplayNameFromVehicleModel(raceVehicle) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(raceVehicle) or "Unknown"
-	elseif type(raceVehicle) == "string" then
-		syncData.vehicle = GetDisplayNameFromVehicleModel(GetHashKey(raceVehicle)) ~= "CARNOTFOUND" and GetDisplayNameFromVehicleModel(GetHashKey(raceVehicle)) or "Unknown"
-	end
-	personalVehicles = {}
-	for k, v in pairs(personals) do
-		if v.plate then
-			personalVehicles[v.plate] = v
-		end
-	end
-	Citizen.CreateThread(function()
-		JoinRace()
-		StartSyncDataToServer()
-		Citizen.Wait(1000)
-		while IsPlayerSwitchInProgress() do Citizen.Wait(0) end
-		enableXboxController = false
-		if joinMidway then
-			if status == "ready" then
-				StartRace()
-			end
-		else
-			TriggerServerEvent("custom_races:server:raceLoaded")
-			Citizen.Wait(5000)
-			while status == "ready" do
-				DisplayCustomMsgs(GetTranslate("wait-players"), false, nil)
-				Citizen.Wait(10000)
-			end
-		end
-	end)
 end)
 
 RegisterNetEvent("custom_races:client:startRace", function()
@@ -3165,7 +3096,7 @@ RegisterNetEvent("custom_races:client:respawning", function(playerId, playerPing
 end)
 
 RegisterNetEvent("custom_races:client:syncExplosion", function(index, hash)
-	if status == "starting" or status == "racing" or status == "spectating" then
+	if status == "racing" or status == "spectating" then
 		for k, v in pairs(explodeProps) do
 			if k == index and v.hash == hash and not v.touching and DoesEntityExist(v.handle) then
 				v.touching = true
@@ -3204,7 +3135,6 @@ RegisterCommand("open_race", function()
 		XboxControlSimulation()
 		LoopGetNUIFramerateMoveFix()
 		TriggerServerCallback("custom_races:server:permission", function(bool, newData, time)
-			showLoadingPrompt = false
 			if newData then
 				races_data_front = newData
 				dataOutdated = false
@@ -3229,30 +3159,9 @@ RegisterCommand("open_race", function()
 				})
 				enableXboxController = false
 			end
+			RemoveLoadingPrompt()
+			status = "freemode"
 		end, dataOutdated)
-		if dataOutdated then
-			showLoadingPrompt = true
-			Citizen.CreateThread(function()
-				local loadCount = 0.0
-				local lastCount = nil
-				while showLoadingPrompt do
-					local displayCount = math.floor(loadCount * 65536 * 100 / dataLen)
-					if not lastCount or lastCount ~= displayCount then
-						lastCount = displayCount
-						RemoveLoadingPrompt()
-						BeginTextCommandBusyString("STRING")
-						AddTextComponentSubstringPlayerName(string.format(GetTranslate("load-progress"), displayCount))
-						EndTextCommandBusyString(4)
-					end
-					if (loadCount + 0.1) * 65536 <= dataLen then
-						loadCount = loadCount + 0.1
-					end
-					Citizen.Wait(100)
-				end
-				RemoveLoadingPrompt()
-				dataLen = 1024
-			end)
-		end
 	end
 end)
 

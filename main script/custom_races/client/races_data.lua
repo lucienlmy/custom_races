@@ -337,8 +337,22 @@ Citizen.CreateThread(function()
 	end)
 end)
 
-RegisterNetEvent("custom_races:client:info", function(len)
-	dataLen = len
+RegisterNetEvent("custom_races:client:info", function(str, info, joinMidway)
+	if str == "track-list" then
+		DisplayBusyspinner("load", 65536, info)
+	elseif str == "track-download" then
+		DisplayBusyspinner("download", 65536, info)
+		if not joinMidway then
+			SendNUIMessage({
+				action = "nui_msg:countDown"
+			})
+		end
+		Citizen.Wait(5000)
+		StopScreenEffect("MenuMGIn")
+		SendNUIMessage({
+			action = "nui_msg:hideLoad"
+		})
+	end
 end)
 
 RegisterNetEvent("custom_races:client:dataOutdated", function()
@@ -451,16 +465,10 @@ end)
 RegisterNUICallback("custom_races:nui:selectVehicleCam", function(data, cb)
 	inVehicleUI = true
 	local ped = PlayerPedId()
-	isPedVisible = IsEntityVisible(ped)
 	SetEntityCoords(ped, -75.1623, -818.9494, 332.9547)
 	SetEntityHeading(ped, 139.5274)
 	FreezeEntityPosition(ped, true)
 	SetEntityVisible(ped, false)
-	if DoesEntityExist(joinRaceVehicle) then
-		SetEntityVisible(joinRaceVehicle, false)
-		SetEntityCollision(joinRaceVehicle, false, false)
-		FreezeEntityPosition(joinRaceVehicle, true)
-	end
 	-- Get player latest vehicles
 	favoriteVehicles = {}
 	personalVehicles = {}
@@ -563,8 +571,6 @@ RegisterNUICallback("custom_races:nui:selectVeh", function(data, cb)
 		if DoesEntityExist(joinRaceVehicle) and NetworkHasControlOfEntity(joinRaceVehicle) then
 			SetEntityCoords(joinRaceVehicle, joinRacePoint)
 			SetEntityHeading(joinRaceVehicle, joinRaceHeading)
-			SetEntityVisible(joinRaceVehicle, true)
-			SetEntityCollision(joinRaceVehicle, true, true)
 			SetPedIntoVehicle(ped, joinRaceVehicle, -1)
 		else
 			SetEntityCoords(ped, joinRacePoint)
@@ -574,13 +580,9 @@ RegisterNUICallback("custom_races:nui:selectVeh", function(data, cb)
 		SetEntityCoordsNoOffset(ped, joinRacePoint)
 		SetEntityHeading(ped, joinRaceHeading)
 	end
-	SetEntityVisible(ped, isPedVisible)
+	SetEntityVisible(ped, true)
 	SetGameplayCamRelativeHeading(0)
 	FreezeEntityPosition(ped, false)
-	if DoesEntityExist(joinRaceVehicle) then
-		FreezeEntityPosition(joinRaceVehicle, false)
-		ActivatePhysics(joinRaceVehicle)
-	end
 end)
 
 RegisterNUICallback("custom_races:nui:getBestTimes", function(data, cb)

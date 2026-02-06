@@ -25,6 +25,8 @@ multiplayer = {
 }
 
 function LoadSessionData(data, data_2)
+	objectPool.isRefreshing = true
+	DisplayBusyspinner("parse", 10000, #data.objects + 10000)
 	for classid = 0, 27 do
 		for i = 1, #data.available_vehicles[classid].vehicles do
 			data.available_vehicles[classid].vehicles[i].name = GetLabelText(GetDisplayNameFromVehicleModel(data.available_vehicles[classid].vehicles[i].hash))
@@ -54,19 +56,27 @@ function LoadSessionData(data, data_2)
 		blips.checkpoints_2[k] = CreateBlipForCreator(v.x, v.y, v.z, 0.9, (v.is_random and 66) or (v.is_transform and 570) or 1, (v.is_random or v.is_transform) and 1 or 5)
 	end
 	fixtureIndex = #currentRace.fixtures
+	Citizen.Wait(1000)
+	local count = 0
 	for k, v in pairs(currentRace.objects) do
 		v.handle = nil
 		local gx = math.floor(v.x / 100.0)
 		local gy = math.floor(v.y / 100.0)
 		objectPool.grids[gx] = objectPool.grids[gx] or {}
 		objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-		objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = v
+		objectPool.grids[gx][gy][v.uniqueId] = v
 		objectPool.all[v.uniqueId] = gx .. "-" .. gy
 		if effectObjects[v.hash] then
 			objectPool.effects[v.uniqueId] = {ptfxHandle == nil, object = v, style = effectObjects[v.hash]}
 		end
+		count = count + 1
+		if count >= 10000 then
+			count = 0
+			Citizen.Wait(1000)
+		end
 	end
 	objectIndex = #currentRace.objects
+	objectPool.isRefreshing = false
 	if currentRace.startingGrid[1] then
 		local default_vehicle = currentRace.default_class and currentRace.available_vehicles[currentRace.default_class] and currentRace.available_vehicles[currentRace.default_class].index and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index] and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index].model or currentRace.test_vehicle
 		local model = tonumber(default_vehicle) or GetHashKey(default_vehicle)
@@ -461,7 +471,7 @@ end)
 
 RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerName, rollback)
 	if not global_var.enableCreator or not inSession then return end
-	while global_var.quitingTest or global_var.joiningTest do Citizen.Wait(0) end
+	while global_var.quitingTest or global_var.joiningTest or objectPool.isRefreshing do Citizen.Wait(0) end
 	if rollback then
 		DisplayCustomMsgs(GetTranslate("session-data-rollback"))
 	end
@@ -644,7 +654,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		local gy = math.floor(object.y / 100.0)
 		objectPool.grids[gx] = objectPool.grids[gx] or {}
 		objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-		objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+		objectPool.grids[gx][gy][object.uniqueId] = object
 		objectPool.all[object.uniqueId] = gx .. "-" .. gy
 		if effectObjects[object.hash] then
 			objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
@@ -660,6 +670,8 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		if (type(data) ~= "table") then return end
 		for k, v in pairs(currentRace.objects) do
 			if v.uniqueId == data.uniqueId then
+				local x = v.x
+				local y = v.y
 				v.modificationCount = data.modificationCount
 				v.hash = data.hash
 				v.x = data.x
@@ -674,6 +686,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 				v.collision = data.collision
 				v.dynamic = data.dynamic
 				objectPool.changedObjects[v.uniqueId] = true
+				RefreshGirdForObject(x, y, v)
 				break
 			end
 		end
@@ -713,12 +726,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		local gx = math.floor(data.x / 100.0)
 		local gy = math.floor(data.y / 100.0)
 		if objectPool.grids[gx] and objectPool.grids[gx][gy] then
-			for i, object in pairs(objectPool.grids[gx][gy]) do
-				if object.uniqueId == data.uniqueId then
-					table.remove(objectPool.grids[gx][gy], i)
-					break
-				end
-			end
+			objectPool.grids[gx][gy][data.uniqueId] = nil
 		end
 		if isPropPickedUp then
 			if currentObject.uniqueId == data.uniqueId then
@@ -745,7 +753,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}

@@ -78,6 +78,9 @@ function ConvertDataFromUGC(data)
 	data.mission.veh.head = data.mission.veh.head or {}
 	data.mission.veh.no = data.mission.veh.no or #data.mission.veh.loc
 
+	objectPool.isRefreshing = true
+	DisplayBusyspinner("parse", 10000, data.mission.prop.no + data.mission.dprop.no + 10000)
+
 	-- ===============================
 	-- Convert ugc data to currentRace
 	-- ===============================
@@ -420,6 +423,8 @@ function ConvertDataFromUGC(data)
 		end
 	end
 	fixtureIndex = #currentRace.fixtures
+	Citizen.Wait(1000)
+	local count = 0
 	local validModels = {}
 	local invalidObjects = {}
 	currentRace.objects = {}
@@ -471,12 +476,17 @@ function ConvertDataFromUGC(data)
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 			end
 			currentRace.objects[#currentRace.objects + 1] = object
+			count = count + 1
+			if count >= 10000 then
+				count = 0
+				Citizen.Wait(1000)
+			end
 		else
 			invalidObjects[model] = true
 		end
@@ -526,12 +536,17 @@ function ConvertDataFromUGC(data)
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
 			end
 			currentRace.objects[#currentRace.objects + 1] = object
+			count = count + 1
+			if count >= 10000 then
+				count = 0
+				Citizen.Wait(1000)
+			end
 		else
 			invalidObjects[object.hash] = true
 		end
@@ -546,6 +561,7 @@ function ConvertDataFromUGC(data)
 		print("Or you can just ignore this message")
 	end
 	objectIndex = #currentRace.objects
+	objectPool.isRefreshing = false
 	if currentRace.startingGrid[1] then
 		local default_vehicle = currentRace.default_class and currentRace.available_vehicles[currentRace.default_class] and currentRace.available_vehicles[currentRace.default_class].index and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index] and currentRace.available_vehicles[currentRace.default_class].vehicles[currentRace.available_vehicles[currentRace.default_class].index].model or currentRace.test_vehicle
 		local model = tonumber(default_vehicle) or GetHashKey(default_vehicle)
@@ -621,6 +637,8 @@ function AddDataFromUGC(data)
 	data.mission.race.trfmvm = data.mission.race.trfmvm or {}
 	data.mission.race.cppsst = data.mission.race.cppsst or {}
 	data.mission.race.chp = data.mission.race.chp or 0
+
+	DisplayBusyspinner("parse", 1000, 2000)
 
 	-- ===============================
 	-- Add ugc data to currentRace
@@ -736,8 +754,8 @@ function AddDataFromUGC(data)
 		modificationCount.checkpoints = modificationCount.checkpoints + 1
 		TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, { checkpoints = currentRace.checkpoints, checkpoints_2 = currentRace.checkpoints_2, modificationCount = modificationCount.checkpoints }, "checkpoints-sync")
 		checkpointIndex = #currentRace.checkpoints
-		Citizen.Wait(1000)
 	end
+	Citizen.Wait(1000)
 	local currentFixturesCount = #currentRace.fixtures
 	local seen = {}
 	for i = 1, data.mission.dhprop.no do
@@ -761,8 +779,8 @@ function AddDataFromUGC(data)
 		modificationCount.fixtures = modificationCount.fixtures + 1
 		TriggerServerEvent("custom_creator:server:syncData", currentRace.raceid, { fixtures = currentRace.fixtures, modificationCount = modificationCount.fixtures }, "fixtures-sync")
 		fixtureIndex = #currentRace.fixtures
-		Citizen.Wait(1000)
 	end
+	Citizen.Wait(1000)
 	local validModels = {}
 	local validObjects = {}
 	local invalidObjects = {}
@@ -814,7 +832,7 @@ function AddDataFromUGC(data)
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
@@ -870,7 +888,7 @@ function AddDataFromUGC(data)
 			local gy = math.floor(object.y / 100.0)
 			objectPool.grids[gx] = objectPool.grids[gx] or {}
 			objectPool.grids[gx][gy] = objectPool.grids[gx][gy] or {}
-			objectPool.grids[gx][gy][#objectPool.grids[gx][gy] + 1] = object
+			objectPool.grids[gx][gy][object.uniqueId] = object
 			objectPool.all[object.uniqueId] = gx .. "-" .. gy
 			if effectObjects[object.hash] then
 				objectPool.effects[object.uniqueId] = {ptfxHandle == nil, object = object, style = effectObjects[object.hash]}
@@ -1241,6 +1259,6 @@ function ConvertDataToUGC()
 		})
 		table.insert(data.mission.veh.head, grid.heading)
 	end
-	DisplayBusyspinner("upload", #json.encode(data) * 1.02)
+	DisplayBusyspinner("upload", 65536, #json.encode(data) * 1.02)
 	return data
 end

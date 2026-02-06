@@ -179,10 +179,9 @@ function CreatePropForCreator(hash, x, y, z, rotX, rotY, rotZ, color)
 		if obj ~= 0 then
 			SetEntityRotation(obj, rotX or 0.0, rotY or 0.0, rotZ or 0.0, 2, 0)
 			SetObjectTextureVariation(obj, color or 0)
-			return obj
-		else
-			return nil
 		end
+		SetModelAsNoLongerNeeded(hash)
+		return obj ~= 0 and obj or nil
 	end
 	return nil
 end
@@ -355,91 +354,83 @@ function DrawCheckpointForCreator(x, y, z, heading, pitch, d_collect, d_draw, is
 		end
 	end
 
-	if (markerDrawCount < 60) or is_preview then
-		local onScreen, screenX, screenY = GetScreenCoordFromWorldCoord(x, y, z)
-		if onScreen or is_preview then
-			if not is_preview then
-				markerDrawCount = markerDrawCount + 1
-			end
-			DrawMarker(
-				marker_1,
-				x_1,
-				y_1,
-				z_1,
-				dirX_1,
-				dirY_1,
-				dirZ_1,
-				rotX_1,
-				rotY_1,
-				rotZ_1,
-				scaleX_1,
-				scaleY_1,
-				scaleZ_1,
-				red_1,
-				green_1,
-				blue_1,
-				alpha_1,
-				false,
-				false,
-				4,
-				nil,
-				nil,
-				false
-			)
-			DrawMarker(
-				marker_2,
-				x_2,
-				y_2,
-				z_2,
-				dirX_2,
-				dirY_2,
-				dirZ_2,
-				rotX_2,
-				rotY_2,
-				rotZ_2,
-				scaleX_2,
-				scaleY_2,
-				scaleZ_2,
-				red_2,
-				green_2,
-				blue_2,
-				alpha_2,
-				false,
-				false,
-				4,
-				nil,
-				nil,
-				false
-			)
-			if highlight then
-				local collect_size = ((is_air and (4.5 * d_collect)) or ((is_round or is_random or is_transform or is_planeRot or is_warp) and (2.25 * d_collect)) or d_collect) * 10
-				DrawMarker(
-					26,
-					x_1,
-					y_1,
-					z_1,
-					0.0,
-					0.0,
-					0.0,
-					0.0,
-					0.0,
-					heading,
-					collect_size,
-					collect_size,
-					(is_round or is_random or is_transform or is_planeRot or is_warp) and collect_size or (collect_size / 2),
-					255,
-					255,
-					255,
-					150,
-					false,
-					false,
-					2,
-					nil,
-					nil,
-					false
-				)
-			end
-		end
+	DrawMarker(
+		marker_1,
+		x_1,
+		y_1,
+		z_1,
+		dirX_1,
+		dirY_1,
+		dirZ_1,
+		rotX_1,
+		rotY_1,
+		rotZ_1,
+		scaleX_1,
+		scaleY_1,
+		scaleZ_1,
+		red_1,
+		green_1,
+		blue_1,
+		alpha_1,
+		false,
+		false,
+		4,
+		nil,
+		nil,
+		false
+	)
+	DrawMarker(
+		marker_2,
+		x_2,
+		y_2,
+		z_2,
+		dirX_2,
+		dirY_2,
+		dirZ_2,
+		rotX_2,
+		rotY_2,
+		rotZ_2,
+		scaleX_2,
+		scaleY_2,
+		scaleZ_2,
+		red_2,
+		green_2,
+		blue_2,
+		alpha_2,
+		false,
+		false,
+		4,
+		nil,
+		nil,
+		false
+	)
+	if highlight then
+		local collect_size = ((is_air and (4.5 * d_collect)) or ((is_round or is_random or is_transform or is_planeRot or is_warp) and (2.25 * d_collect)) or d_collect) * 10
+		DrawMarker(
+			26,
+			x_1,
+			y_1,
+			z_1,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			heading,
+			collect_size,
+			collect_size,
+			(is_round or is_random or is_transform or is_planeRot or is_warp) and collect_size or (collect_size / 2),
+			255,
+			255,
+			255,
+			150,
+			false,
+			false,
+			2,
+			nil,
+			nil,
+			false
+		)
 	end
 end
 
@@ -1290,17 +1281,31 @@ function SetupScaleform(scaleform)
 			ButtonMessage(GetTranslate("CamZoom"))
 			EndScaleformMovieMethod()
 
-			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
-			ScaleformMovieMethodAddParamInt(2)
-			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
-			ButtonMessage(string.format(GetTranslate("CamMoveSpeed"), speed.cam_pos.value[speed.cam_pos.index][1]))
-			EndScaleformMovieMethod()
+			if speed.key then
+				BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+				ScaleformMovieMethodAddParamInt(2)
+				ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
+				ButtonMessage(string.format(GetTranslate("-ChangeSpeed"), speed[speed.key].value[speed[speed.key].index][1]))
+				EndScaleformMovieMethod()
 
-			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
-			ScaleformMovieMethodAddParamInt(1)
-			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
-			ButtonMessage(string.format(GetTranslate("CamRotateSpeed"), speed.cam_rot.value[speed.cam_rot.index][1]))
-			EndScaleformMovieMethod()
+				BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+				ScaleformMovieMethodAddParamInt(1)
+				ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
+				ButtonMessage(string.format(GetTranslate("+ChangeSpeed"), speed[speed.key].value[speed[speed.key].index][1]))
+				EndScaleformMovieMethod()
+			else
+				BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+				ScaleformMovieMethodAddParamInt(2)
+				ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
+				ButtonMessage(string.format(GetTranslate("CamMoveSpeed"), speed.cam_pos.value[speed.cam_pos.index][1]))
+				EndScaleformMovieMethod()
+
+				BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+				ScaleformMovieMethodAddParamInt(1)
+				ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
+				ButtonMessage(string.format(GetTranslate("CamRotateSpeed"), speed.cam_rot.value[speed.cam_rot.index][1]))
+				EndScaleformMovieMethod()
+			end
 		end
 		BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
 		ScaleformMovieMethodAddParamInt(0)
@@ -1360,17 +1365,31 @@ function SetupScaleform(scaleform)
 		ButtonMessage(GetTranslate("CamZoom"))
 		EndScaleformMovieMethod()
 
-		BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
-		ScaleformMovieMethodAddParamInt(3)
-		ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
-		ButtonMessage(string.format(GetTranslate("CamMoveSpeed"), speed.cam_pos.value[speed.cam_pos.index][1]))
-		EndScaleformMovieMethod()
+		if speed.key then
+			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+			ScaleformMovieMethodAddParamInt(3)
+			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
+			ButtonMessage(string.format(GetTranslate("-ChangeSpeed"), speed[speed.key].value[speed[speed.key].index][1]))
+			EndScaleformMovieMethod()
 
-		BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
-		ScaleformMovieMethodAddParamInt(2)
-		ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
-		ButtonMessage(string.format(GetTranslate("CamRotateSpeed"), speed.cam_rot.value[speed.cam_rot.index][1]))
-		EndScaleformMovieMethod()
+			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+			ScaleformMovieMethodAddParamInt(2)
+			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
+			ButtonMessage(string.format(GetTranslate("+ChangeSpeed"), speed[speed.key].value[speed[speed.key].index][1]))
+			EndScaleformMovieMethod()
+		else
+			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+			ScaleformMovieMethodAddParamInt(3)
+			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 254 or 226, true))
+			ButtonMessage(string.format(GetTranslate("CamMoveSpeed"), speed.cam_pos.value[speed.cam_pos.index][1]))
+			EndScaleformMovieMethod()
+
+			BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
+			ScaleformMovieMethodAddParamInt(2)
+			ScaleformMovieMethodAddParamPlayerNameString(GetControlInstructionalButton(2, global_var.IsUsingKeyboard and 326 or 227, true))
+			ButtonMessage(string.format(GetTranslate("CamRotateSpeed"), speed.cam_rot.value[speed.cam_rot.index][1]))
+			EndScaleformMovieMethod()
+		end
 
 		BeginScaleformMovieMethod(scaleform, "SET_DATA_SLOT")
 		ScaleformMovieMethodAddParamInt(1)
@@ -1406,41 +1425,37 @@ function DisplayCustomMsgs(msg)
 	end)
 end
 
-function DisplayBusyspinner(status, len)
-	if status ~= "" and len > 0 and (global_var.lock or lockSession) then
+function DisplayBusyspinner(str, coefficient, len)
+	if str ~= "" and coefficient and len > 0 then
 		Citizen.CreateThread(function()
 			local loadCount = 0.0
 			local lastCount = nil
-			local breakCount = 0
-			global_var.status = status
-			while global_var.status == status do
-				local displayCount = math.floor(loadCount * 65536 * 100 / len)
+			global_var.status = str
+			while global_var.status == str do
+				local displayCount = math.floor(loadCount * coefficient * 100 / len)
 				if not lastCount or lastCount ~= displayCount then
 					lastCount = displayCount
 					local text = displayCount .. "%"
-					if status == "load" then
+					if str == "load" then
 						text = string.format(GetTranslate("load-progress"), displayCount)
-					elseif status == "download" then
+					elseif str == "download" then
 						text = string.format(GetTranslate("download-progress"), displayCount)
-					elseif status == "upload" then
-						text = string.format(GetTranslate("upload-progress"), displayCount)
-					elseif status == "sync" then
+					elseif str == "parse" then
+						text = string.format(GetTranslate("parse-progress"), displayCount)
+					elseif str == "sync" then
 						text = string.format(GetTranslate("sync-progress"), displayCount)
+					elseif str == "upload" then
+						text = string.format(GetTranslate("upload-progress"), displayCount)
+					elseif str == "refresh" then
+						text = string.format(GetTranslate("refresh-progress"), displayCount)
 					end
 					RemoveLoadingPrompt()
 					BeginTextCommandBusyString("STRING")
 					AddTextComponentSubstringPlayerName(text)
 					EndTextCommandBusyString(4)
 				end
-				if (loadCount + 0.1) * 65536 <= len then
+				if (loadCount + 0.1) * coefficient <= len then
 					loadCount = loadCount + 0.1
-				else
-					breakCount = breakCount + 1
-					if breakCount >= 20 and not (global_var.lock or lockSession) then
-						RemoveLoadingPrompt()
-						global_var.status = ""
-						break
-					end
 				end
 				Citizen.Wait(100)
 			end
