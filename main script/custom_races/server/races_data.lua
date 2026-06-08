@@ -240,3 +240,7 @@ AddEventHandler("custom_races:server:updateAllRace", function()
 		end
 	end
 end)
+
+exports("loadTrackFile", function(fileName)
+	return json.decode(LoadResourceFile(GetCurrentResourceName(), type(fileName) == "string" and fileName:gsub("^/+", "") or ""))
+end)

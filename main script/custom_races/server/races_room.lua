@@ -25,17 +25,17 @@ function Room.StartRaceRoom(currentRoom, raceid)
 	Citizen.CreateThread(function()
 		local data = nil
 		if raceid then
-			local route_file, category = nil, nil
+			local path, category = nil, nil
 			local result = MySQL.query.await("SELECT * FROM custom_race_list WHERE raceid = ?", {raceid})
 			if result and #result > 0 then
-				route_file = result[1].route_file
+				path = result[1].route_file
 				category = result[1].category
 			end
-			if route_file and category then
-				if string.find(route_file, "local_files") then
-					data = json.decode(LoadResourceFile(GetCurrentResourceName(), route_file))
-				else
-					data = json.decode(LoadResourceFile("custom_creator", route_file))
+			if path and category then
+				if string.find(path, "local_files") and GetResourceState("custom_races") == "started" and exports["custom_races"] and exports["custom_races"].loadTrackFile then
+					data = exports["custom_races"]:loadTrackFile(path)
+				elseif string.find(path, "custom_files") and GetResourceState("custom_creator") == "started" and exports["custom_creator"] and exports["custom_creator"].loadTrackFile then
+					data = exports["custom_creator"]:loadTrackFile(path)
 				end
 				if category ~= "Custom" and data and data.mission and data.mission.gen then
 					data.mission.gen.ownerid = category

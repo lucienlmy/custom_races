@@ -324,7 +324,12 @@ CreateServerCallback("custom_creator:server:getJson", function(player, callback,
 				category = query[1].category
 				published = query[1].published ~= "x"
 				if path then
-					local data = json.decode(LoadResourceFile(string.find(path, "custom_files") and GetCurrentResourceName() or "custom_races", path))
+					local data = nil
+					if string.find(path, "local_files") and GetResourceState("custom_races") == "started" and exports["custom_races"] and exports["custom_races"].loadTrackFile then
+						data = exports["custom_races"]:loadTrackFile(path)
+					elseif string.find(path, "custom_files") and GetResourceState("custom_creator") == "started" and exports["custom_creator"] and exports["custom_creator"].loadTrackFile then
+						data = exports["custom_creator"]:loadTrackFile(path)
+					end
 					if data then
 						data.raceid = raceid
 						data.published = published
@@ -456,8 +461,8 @@ CreateServerCallback("custom_creator:server:saveFile", function(player, callback
 		else
 			data.contributors = {identifier}
 		end
-		local r_path = "/custom_files/" .. (og_license or identifier)
-		local a_path = GetResourcePath(resourceName) .. r_path
+		local r_path = "custom_files/" .. (og_license or identifier)
+		local a_path = GetResourcePath(resourceName) .. "/" .. r_path
 		local continue = os and os.createdir and true or false
 		if continue then
 			local success, _error = os.createdir(a_path)
@@ -473,7 +478,7 @@ CreateServerCallback("custom_creator:server:saveFile", function(player, callback
 			return
 		end
 		if path and string.find(path, "custom_files") and (path:match("([^/]+)%.json$") ~= data.mission.gen.nm) then
-			os.remove(GetResourcePath(resourceName) .. path)
+			os.remove(GetResourcePath(resourceName) .. "/" .. path:gsub("^/+", ""))
 		end
 		if not found then
 			if action == "publish" or action == "save" then

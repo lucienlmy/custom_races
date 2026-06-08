@@ -43,3 +43,7 @@ function RoundedValue(value, numDecimalPlaces)
 		return math.floor(value + 0.5)
 	end
 end
+
+exports("loadTrackFile", function(fileName)
+	return json.decode(LoadResourceFile(GetCurrentResourceName(), type(fileName) == "string" and fileName:gsub("^/+", "") or ""))
+end)
