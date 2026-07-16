@@ -2231,9 +2231,19 @@ function RageUI.PoolMenus:Creator()
 			end
 		end)
 
-		Items:AddList(string.format(GetTranslate("PlacementSubMenu_Props-List-Model"), category[categoryIndex].index, #category[categoryIndex].model), category[categoryIndex].model, category[categoryIndex].index, nil, { IsDisabled = isPropPickedUp or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
-			if (onListChange) then
-				category[categoryIndex].index = Index
+		Items:AddList(string.format(GetTranslate("PlacementSubMenu_Props-List-Model"), category[categoryIndex].index, #category[categoryIndex].model), { GetObjectLabelText(category[categoryIndex].model[category[categoryIndex].index]) }, 1, nil, { IsDisabled = isPropPickedUp or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
+			if (onListChange) == "left" then
+				local index = category[categoryIndex].index - 1
+				if index < 1 then
+					index = #category[categoryIndex].model
+				end
+				category[categoryIndex].index = index
+			elseif (onListChange) == "right" then
+				local index = category[categoryIndex].index + 1
+				if index > #category[categoryIndex].model then
+					index = 1
+				end
+				category[categoryIndex].index = index
 			end
 			if (onSelected) or (onListChange) then
 				if objectPreview then
@@ -2322,16 +2332,14 @@ function RageUI.PoolMenus:Creator()
 			end
 			Items:AddList(GetTranslate("PlacementSubMenu_Props-List-BoneIndexParent"), { snappingObject.handle and GetBoneNameFromIndex(snappingObject.handle, snappingObject.boneIndexParent) or "" }, 1, nil, { IsDisabled = not snappingObject.handle or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
 				if (onListChange) == "left" then
-					local index = snappingObject.boneIndexParent
-					index = index - 1
+					local index = snappingObject.boneIndexParent - 1
 					if index < -28 then
 						index = GetEntityBoneCount(snappingObject.handle) - 1
 					end
 					snappingObject.boneIndexParent = index
 					SetObjectNewPositionAndRotationEnhanced()
 				elseif (onListChange) == "right" then
-					local index = snappingObject.boneIndexParent
-					index = index + 1
+					local index = snappingObject.boneIndexParent + 1
 					if index > GetEntityBoneCount(snappingObject.handle) - 1 then
 						index = -28
 					end
@@ -2342,16 +2350,14 @@ function RageUI.PoolMenus:Creator()
 
 			Items:AddList(GetTranslate("PlacementSubMenu_Props-List-BoneIndexChild"), { currentObject.handle and GetBoneNameFromIndex(currentObject.handle, snappingObject.boneIndexChild) or "" }, 1, nil, { IsDisabled = not currentObject.handle or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
 				if (onListChange) == "left" then
-					local index = snappingObject.boneIndexChild
-					index = index - 1
+					local index = snappingObject.boneIndexChild - 1
 					if index < -28 then
 						index = GetEntityBoneCount(currentObject.handle) - 1
 					end
 					snappingObject.boneIndexChild = index
 					SetObjectNewPositionAndRotationEnhanced()
 				elseif (onListChange) == "right" then
-					local index = snappingObject.boneIndexChild
-					index = index + 1
+					local index = snappingObject.boneIndexChild + 1
 					if index > GetEntityBoneCount(currentObject.handle) - 1 then
 						index = -28
 					end
@@ -2394,15 +2400,13 @@ function RageUI.PoolMenus:Creator()
 				end
 				Items:AddList(GetTranslate("PlacementSubMenu_Props-List-AlignmentEnhanced"), { currentObject.handle and GetBoneNameFromIndex(currentObject.handle, propOverrideRotIndex) or "" }, 1, nil, { IsDisabled = not currentObject.handle or global_var.IsNuiFocused or lockSession }, function(Index, onSelected, onListChange)
 					if (onListChange) == "left" then
-						local index = propOverrideRotIndex
-						index = index - 1
+						local index = propOverrideRotIndex - 1
 						if index < -28 then
 							index = GetEntityBoneCount(currentObject.handle) - 1
 						end
 						propOverrideRotIndex = index
 					elseif (onListChange) == "right" then
-						local index = propOverrideRotIndex
-						index = index + 1
+						local index = propOverrideRotIndex + 1
 						if index > GetEntityBoneCount(currentObject.handle) - 1 then
 							index = -28
 						end

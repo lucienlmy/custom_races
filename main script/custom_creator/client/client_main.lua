@@ -79,7 +79,7 @@ speed = {
 			{"0.01x", 0.01},
 			{"0.1x", 0.1},
 			{"1x", 1.0},
-			{"10x", 10.0},
+			{"10x", 10.0}
 		}
 	},
 	checkpoint_offset = {
@@ -372,6 +372,7 @@ seconds = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 hud_colors = {{255, 255, 255}, {240, 240, 240}, {155, 155, 155}, {205, 205, 205}, {224, 50, 50}, {240, 153, 153}, {93, 182, 229}, {174, 219, 242}, {240, 200, 80}, {254, 235, 169}, {255, 133, 85}, {255, 194, 170}, {114, 204, 114}, {185, 230, 185}, {132, 102, 226}, {192, 179, 239}, {203, 54, 148}, {235, 36, 39}, {194, 80, 80}, {156, 110, 175}, {255, 123, 196}, {247, 159, 123}, {178, 144, 132}, {141, 206, 167}, {113, 169, 175}, {211, 209, 231}, {144, 127, 153}, {106, 196, 191}, {214, 196, 153}, {234, 142, 80}, {152, 203, 234}, {178, 98, 135}, {144, 142, 122}, {166, 117, 94}, {175, 168, 168}, {232, 142, 155}, {187, 214, 91}, {123, 196, 255}, {171, 60, 230}, {206, 169, 13}, {71, 99, 173}, {42, 166, 185}, {186, 157, 125}, {201, 225, 255}, {240, 240, 150}, {237, 140, 161}, {249, 138, 138}, {252, 239, 166}, {240, 240, 240}, {159, 201, 166}, {140, 140, 140}, {240, 160, 0}, {140, 140, 140}, {140, 140, 140}, {100, 112, 127}, {120, 120, 75}, {152, 76, 93}, {124, 69, 69}, {180, 130, 97}, {150, 153, 161}, {214, 181, 99}, {166, 221, 190}, {29, 100, 153}, {214, 116, 15}, {135, 125, 142}, {229, 119, 185}, {252, 239, 166}, {45, 110, 185}, {93, 182, 229}, {194, 80, 80}, {154, 154, 154}, {194, 80, 80}, {252, 115, 201}, {252, 177, 49}, {109, 247, 204}, {241, 101, 34}, {214, 189, 97}, {234, 153, 28}, {146, 200, 62}, {234, 153, 28}, {66, 89, 148}, {164, 76, 242}, {101, 180, 212}, {171, 237, 171}, {255, 163, 87}, {235, 239, 30}, {255, 149, 14}, {246, 60, 161}, {210, 166, 249}, {82, 38, 121}, {127, 81, 43}, {240, 240, 240}, {234, 153, 28}, {225, 140, 8}, {48, 255, 255}, {48, 255, 0}, {176, 80, 0}, {53, 166, 224}, {162, 79, 157}, {104, 192, 141}, {29, 100, 153}, {234, 153, 28}, {240, 160, 1}, {247, 159, 123}, {226, 134, 187}, {239, 238, 151}, {113, 169, 175}, {160, 140, 193}, {141, 206, 167}, {181, 214, 234}, {178, 144, 132}, {0, 132, 114}, {216, 85, 117}, {30, 100, 152}, {43, 181, 117}, {233, 141, 79}, {137, 210, 215}, {134, 125, 141}, {109, 34, 33}, {255, 0, 0}, {255, 255, 0}, {0, 255, 0}, {0, 255, 255}, {0, 0, 255}, {255, 0, 255}, {38, 136, 234}, {154, 178, 54}, {93, 107, 45}, {206, 169, 13}, {0, 151, 151}}
 creatorVehicle = {}
 personalVehicles = {}
+labels = {}
 
 Citizen.CreateThread(function()
 	while true do
@@ -448,7 +449,6 @@ function OpenCreator()
 		end
 		templates = myData.templates or {}
 		templateIndex = #templates
-		personalVehicles = {}
 		for k, v in pairs(myData.vehicles or {}) do
 			if v.plate then
 				personalVehicles[v.plate] = v
@@ -533,6 +533,13 @@ function OpenCreator()
 	ClearAreaLeaveVehicleHealth(joinCreatorPoint.x + 0.0, joinCreatorPoint.y + 0.0, joinCreatorPoint.z + 0.0, 100000000000000000000000.0, false, false, false, false, false)
 	RequestScriptAudioBank("DLC_AIRRACES/AIR_RACE_01", false, -1)
 	RequestScriptAudioBank("DLC_AIRRACES/AIR_RACE_02", false, -1)
+	RequestAdditionalText("FMMC", 2)
+	Citizen.CreateThread(function()
+		for object, objectLabel in pairs(json.decode(LoadResourceFile("custom_creator", "client/label.json")) or {}) do
+			local objectHash = tonumber(object) or GetHashKey(object)
+			labels[objectHash] = objectLabel
+		end
+	end)
 	Citizen.CreateThread(function()
 		while global_var.enableCreator and not global_var.quitingCreator do
 			ped = PlayerPedId()
@@ -2583,6 +2590,7 @@ function ExitCreator()
 		end
 		ReleaseNamedRendertarget("blimp_text")
 		ReleaseScriptAudioBank()
+		ClearAdditionalText(2, true)
 		SetRadarBigmapEnabled(false, false)
 		Citizen.Wait(0)
 		SetRadarZoom(1200)
@@ -2621,6 +2629,8 @@ function ExitCreator()
 		joinCreatorHeading = nil
 		joinCreatorVehicleNetId = nil
 		creatorVehicle = {}
+		personalVehicles = {}
+		labels = {}
 		blips.checkpoints = {}
 		blips.checkpoints_2 = {}
 		currentRace = {

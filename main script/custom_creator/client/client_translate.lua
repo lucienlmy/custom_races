@@ -4840,34 +4840,34 @@ local translation = {
 		["cn"] = "%s 更新了烟花设定"
 	},
 	["objects-place"] = {
-		["en"] = "%s placed new object: hash = %s, x = %s, y = %s, z = %s",
-		["fr"] = "%s a placé un nouvel objet: hash = %s, x = %s, y = %s, z = %s",
-		["de"] = "%s hat ein neues Objekt platziert: hash = %s, x = %s, y = %s, z = %s",
-		["it"] = "%s ha posizionato un nuovo oggetto: hash = %s, x = %s, y = %s, z = %s",
-		["es"] = "%s colocó un nuevo objeto: hash = %s, x = %s, y = %s, z = %s",
-		["br"] = "%s colocou novo objeto: hash = %s, x = %s, y = %s, z = %s",
-		["pl"] = "%s umieścił nowy obiekt: hash = %s, x = %s, y = %s, z = %s",
-		["ru"] = "%s разместил новый объект: hash = %s, x = %s, y = %s, z = %s",
-		["ko"] = "%s 이(가) 새 오브젝트를 배치했습니다: hash = %s, x = %s, y = %s, z = %s",
-		["zh"] = "%s 放置了新道具: hash = %s, x = %s, y = %s, z = %s",
-		["jp"] = "%s が新しいオブジェクトを配置しました: hash = %s, x = %s, y = %s, z = %s",
-		["mx"] = "%s colocó un nuevo objeto: hash = %s, x = %s, y = %s, z = %s",
-		["cn"] = "%s 放置了新道具: hash = %s, x = %s, y = %s, z = %s"
+		["en"] = "%s placed new object: %s, hash = %s, x = %s, y = %s, z = %s",
+		["fr"] = "%s a placé un nouvel objet: %s, hash = %s, x = %s, y = %s, z = %s",
+		["de"] = "%s hat ein neues Objekt platziert: %s, hash = %s, x = %s, y = %s, z = %s",
+		["it"] = "%s ha posizionato un nuovo oggetto: %s, hash = %s, x = %s, y = %s, z = %s",
+		["es"] = "%s colocó un nuevo objeto: %s, hash = %s, x = %s, y = %s, z = %s",
+		["br"] = "%s colocou novo objeto: %s, hash = %s, x = %s, y = %s, z = %s",
+		["pl"] = "%s umieścił nowy obiekt: %s, hash = %s, x = %s, y = %s, z = %s",
+		["ru"] = "%s разместил новый объект: %s, hash = %s, x = %s, y = %s, z = %s",
+		["ko"] = "%s 이(가) 새 오브젝트를 배치했습니다: %s, hash = %s, x = %s, y = %s, z = %s",
+		["zh"] = "%s 放置了新道具: %s, hash = %s, x = %s, y = %s, z = %s",
+		["jp"] = "%s が新しいオブジェクトを配置しました: %s, hash = %s, x = %s, y = %s, z = %s",
+		["mx"] = "%s colocó un nuevo objeto: %s, hash = %s, x = %s, y = %s, z = %s",
+		["cn"] = "%s 放置了新道具: %s, hash = %s, x = %s, y = %s, z = %s"
 	},
 	["objects-delete"] = {
-		["en"] = "%s deleted object: %s, hash = %s, x = %s, y = %s, z = %s",
-		["fr"] = "%s a supprimé l'objet: %s, hash = %s, x = %s, y = %s, z = %s",
-		["de"] = "%s hat Objekt gelöscht: %s, hash = %s, x = %s, y = %s, z = %s",
-		["it"] = "%s ha eliminato l'oggetto: %s, hash = %s, x = %s, y = %s, z = %s",
-		["es"] = "%s eliminó el objeto: %s, hash = %s, x = %s, y = %s, z = %s",
-		["br"] = "%s excluiu o objeto: %s, hash = %s, x = %s, y = %s, z = %s",
-		["pl"] = "%s usunął obiekt: %s, hash = %s, x = %s, y = %s, z = %s",
-		["ru"] = "%s удалил объект: %s, hash = %s, x = %s, y = %s, z = %s",
-		["ko"] = "%s 이(가) 오브젝트를 삭제했습니다: %s, hash = %s, x = %s, y = %s, z = %s",
-		["zh"] = "%s 刪除了道具: %s, hash = %s, x = %s, y = %s, z = %s",
-		["jp"] = "%s がオブジェクトを削除しました: %s, hash = %s, x = %s, y = %s, z = %s",
-		["mx"] = "%s eliminó el objeto: %s, hash = %s, x = %s, y = %s, z = %s",
-		["cn"] = "%s 删除了道具: %s, hash = %s, x = %s, y = %s, z = %s"
+		["en"] = "%s deleted object: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["fr"] = "%s a supprimé l'objet: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["de"] = "%s hat Objekt gelöscht: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["it"] = "%s ha eliminato l'oggetto: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["es"] = "%s eliminó el objeto: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["br"] = "%s excluiu o objeto: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["pl"] = "%s usunął obiekt: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["ru"] = "%s удалил объект: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["ko"] = "%s 이(가) 오브젝트를 삭제했습니다: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["zh"] = "%s 刪除了道具: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["jp"] = "%s がオブジェクトを削除しました: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["mx"] = "%s eliminó el objeto: %s, %s, hash = %s, x = %s, y = %s, z = %s",
+		["cn"] = "%s 删除了道具: %s, %s, hash = %s, x = %s, y = %s, z = %s"
 	},
 	["template-place"] = {
 		["en"] = "%s placed %s objects",
@@ -5337,4 +5337,11 @@ function GetTranslate(text, currentLanguage)
 		end
 	end
 	return "Error Text"
+end
+
+function GetObjectLabelText(object)
+	local objectHash = tonumber(object) or GetHashKey(object)
+	local objectLabel = labels[objectHash]
+	local objectlabelText = objectLabel and GetLabelText(objectLabel) or "NULL"
+	return objectlabelText ~= "NULL" and objectlabelText or object
 end

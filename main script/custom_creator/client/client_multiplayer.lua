@@ -659,7 +659,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 			objectIndex = #currentRace.objects
 		end
 		if playerName then
-			DisplayCustomMsgs(string.format(GetTranslate("objects-place"), playerName, data.hash, data.x, data.y, data.z))
+			DisplayCustomMsgs(string.format(GetTranslate("objects-place"), playerName, GetObjectLabelText(data.hash), data.hash, data.x, data.y, data.z))
 		end
 	elseif str == "objects-change" then
 		if (type(data) ~= "table") then return end
@@ -690,7 +690,7 @@ RegisterNetEvent("custom_creator:client:syncData", function(data, str, playerNam
 		for k, v in pairs(currentRace.objects) do
 			if v.uniqueId == data.uniqueId then
 				if playerName then
-					DisplayCustomMsgs(string.format(GetTranslate("objects-delete"), playerName, k, v.hash, v.x, v.y, v.z))
+					DisplayCustomMsgs(string.format(GetTranslate("objects-delete"), playerName, k, GetObjectLabelText(data.hash), v.hash, v.x, v.y, v.z))
 				end
 				table.remove(currentRace.objects, k)
 				break

@@ -38,5 +38,6 @@ ui_page "html/index.html"
 
 files {
 	"html/index.html",
-	"html/jquery-3.6.0.min.js"
+	"html/jquery-3.6.0.min.js",
+	"client/label.json"
 }

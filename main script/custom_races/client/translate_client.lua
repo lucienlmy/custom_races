@@ -2417,7 +2417,7 @@ local translation = {
 		["zh"] = "最後一圈",
 		["jp"] = "ラストラップ",
 		["mx"] = "Última Vuelta",
-		["cn"] = "最后一圈",
+		["cn"] = "最后一圈"
 	},
 	["racing-ui-label_bestlap"] = {
 		["en"] = "Best Lap",

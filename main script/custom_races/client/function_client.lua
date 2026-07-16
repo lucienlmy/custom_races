@@ -422,8 +422,7 @@ function SetVehicleProperties(vehicle, props)
 		SetVehicleXenonLightsColor(vehicle, props.xenonColor)
 	end
 	if props.customXenonColor ~= nil then
-		SetVehicleXenonLightsCustomColor(vehicle, props.customXenonColor[1], props.customXenonColor[2],
-			props.customXenonColor[3])
+		SetVehicleXenonLightsCustomColor(vehicle, props.customXenonColor[1], props.customXenonColor[2], props.customXenonColor[3])
 	end
 	if props.modSmokeEnabled ~= nil then
 		ToggleVehicleMod(vehicle, 20, true)
